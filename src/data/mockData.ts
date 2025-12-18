@@ -229,24 +229,24 @@ export const mockUploadedReports: UploadedReport[] = [
   },
 ];
 
-export const CONTRACT_TYPES: Record<string, { name: string; color: string }> = {
-  indefinido: { name: 'Indefinido', color: 'hsl(142 76% 36%)' },
-  plazo_fijo: { name: 'Plazo Fijo', color: 'hsl(38 92% 50%)' },
-  tiempo_parcial: { name: 'Tiempo Parcial', color: 'hsl(217 91% 50%)' },
-  practicas: { name: 'Prácticas', color: 'hsl(262 83% 58%)' },
-  locacion: { name: 'Locación de Servicios', color: 'hsl(188 94% 43%)' },
+export const CONTRACT_TYPES: Record<string, { name: string; variant: 'success' | 'warning' | 'primary' | 'secondary' | 'info' }> = {
+  indefinido: { name: 'Indefinido', variant: 'success' },
+  plazo_fijo: { name: 'Plazo Fijo', variant: 'warning' },
+  tiempo_parcial: { name: 'Tiempo Parcial', variant: 'primary' },
+  practicas: { name: 'Prácticas', variant: 'secondary' },
+  locacion: { name: 'Locación de Servicios', variant: 'info' },
 };
 
-export const REQUIREMENT_STATUS: Record<string, { name: string; color: string }> = {
-  pending: { name: 'Pendiente', color: 'hsl(38 92% 50%)' },
-  approved: { name: 'Aprobado', color: 'hsl(142 76% 36%)' },
-  rejected: { name: 'Rechazado', color: 'hsl(0 84% 60%)' },
-  in_process: { name: 'En Proceso', color: 'hsl(217 91% 50%)' },
-  completed: { name: 'Completado', color: 'hsl(188 94% 43%)' },
+export const REQUIREMENT_STATUS: Record<string, { name: string; className: string }> = {
+  pending: { name: 'Pendiente', className: 'bg-warning/10 text-warning border-warning/20' },
+  approved: { name: 'Aprobado', className: 'bg-success/10 text-success border-success/20' },
+  rejected: { name: 'Rechazado', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  in_process: { name: 'En Proceso', className: 'bg-primary/10 text-primary border-primary/20' },
+  completed: { name: 'Completado', className: 'bg-info/10 text-info border-info/20' },
 };
 
-export const PRIORITY_LEVELS: Record<string, { name: string; color: string }> = {
-  alta: { name: 'Alta', color: 'hsl(0 84% 60%)' },
-  media: { name: 'Media', color: 'hsl(38 92% 50%)' },
-  baja: { name: 'Baja', color: 'hsl(142 76% 36%)' },
+export const PRIORITY_LEVELS: Record<string, { name: string; className: string }> = {
+  alta: { name: 'Alta', className: 'bg-destructive/10 text-destructive border-destructive/20' },
+  media: { name: 'Media', className: 'bg-warning/10 text-warning border-warning/20' },
+  baja: { name: 'Baja', className: 'bg-success/10 text-success border-success/20' },
 };

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
-import { FileCheck, Search, Plus, AlertTriangle, Calendar, DollarSign, User } from 'lucide-react';
+import { FileCheck, Search, Plus, AlertTriangle, DollarSign, User } from 'lucide-react';
 import { mockContracts, mockEmployees, CONTRACT_TYPES } from '@/data/mockData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,17 +28,13 @@ const ContractsPage = () => {
   });
 
   const getStatusBadge = (status: string) => {
-    const styles = {
-      active: 'bg-success/10 text-success',
-      expired: 'bg-destructive/10 text-destructive',
-      pending_renewal: 'bg-warning/10 text-warning',
+    const config = {
+      active: { label: 'Activo', variant: 'success' as const },
+      expired: { label: 'Vencido', variant: 'destructive' as const },
+      pending_renewal: { label: 'Por Renovar', variant: 'warning' as const },
     };
-    const labels = {
-      active: 'Activo',
-      expired: 'Vencido',
-      pending_renewal: 'Por Renovar',
-    };
-    return <Badge className={styles[status as keyof typeof styles]}>{labels[status as keyof typeof labels]}</Badge>;
+    const { label, variant } = config[status as keyof typeof config] || { label: status, variant: 'secondary' as const };
+    return <Badge variant={variant}>{label}</Badge>;
   };
 
   const expiringContracts = contractsWithEmployee.filter(c => c.status === 'pending_renewal');
@@ -51,7 +47,7 @@ const ContractsPage = () => {
             <h1 className="text-2xl font-bold">Contratos</h1>
             <p className="text-muted-foreground">Gestión de contratos laborales</p>
           </div>
-          <Button className="gradient-primary">
+          <Button className="gradient-primary text-primary-foreground">
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Contrato
           </Button>
@@ -69,7 +65,7 @@ const ContractsPage = () => {
                     <h3 className="font-semibold mb-2">Contratos por vencer</h3>
                     <div className="flex flex-wrap gap-2">
                       {expiringContracts.map(c => (
-                        <Badge key={c.id} variant="outline" className="border-warning text-warning">
+                        <Badge key={c.id} variant="warning">
                           {c.employee?.name} - Vence: {c.endDate}
                         </Badge>
                       ))}
@@ -126,7 +122,7 @@ const ContractsPage = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" style={{ borderColor: CONTRACT_TYPES[contract.type]?.color, color: CONTRACT_TYPES[contract.type]?.color }}>
+                        <Badge variant={CONTRACT_TYPES[contract.type]?.variant || 'secondary'}>
                           {CONTRACT_TYPES[contract.type]?.name}
                         </Badge>
                       </TableCell>
