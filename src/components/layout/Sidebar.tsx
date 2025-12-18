@@ -115,7 +115,7 @@ export function Sidebar() {
                   'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
                   isActive
                     ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                    : 'text-sidebar-foreground/90 hover:bg-sidebar-accent hover:text-sidebar-foreground'
                 )
               }
             >
@@ -130,7 +130,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-sidebar-border">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10"
+          className="w-full justify-start gap-3 text-sidebar-foreground/90 hover:text-destructive hover:bg-destructive/10"
           onClick={signOut}
         >
           <LogOut className="w-5 h-5" />
