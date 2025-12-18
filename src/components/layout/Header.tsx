@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -30,6 +31,9 @@ export function Header() {
 
       {/* Actions */}
       <div className="flex items-center gap-4">
+        {/* Theme Toggle */}
+        <ThemeToggle />
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
