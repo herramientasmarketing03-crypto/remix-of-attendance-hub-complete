@@ -32,7 +32,7 @@ const RequirementsPage = () => {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary">
+              <Button className="gradient-primary text-primary-foreground">
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Requerimiento
               </Button>
@@ -91,7 +91,7 @@ const RequirementsPage = () => {
                   <Label>Rango Salarial</Label>
                   <div className="flex items-center gap-2">
                     <Input placeholder="Mín" type="number" />
-                    <span>-</span>
+                    <span className="text-muted-foreground">-</span>
                     <Input placeholder="Máx" type="number" />
                   </div>
                 </div>
@@ -99,7 +99,7 @@ const RequirementsPage = () => {
                   <Label>Justificación</Label>
                   <Textarea placeholder="Explica por qué se necesita este personal..." rows={3} />
                 </div>
-                <Button className="w-full gradient-primary" onClick={handleSubmit}>
+                <Button className="w-full gradient-primary text-primary-foreground" onClick={handleSubmit}>
                   Enviar Requerimiento
                 </Button>
               </div>
@@ -120,8 +120,8 @@ const RequirementsPage = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
-                          <div className="p-2 rounded-lg" style={{ backgroundColor: `${deptInfo.color}20` }}>
-                            <UserPlus className="w-5 h-5" style={{ color: deptInfo.color }} />
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <UserPlus className="w-5 h-5 text-primary" />
                           </div>
                           <div>
                             <h3 className="font-semibold text-lg">{req.position}</h3>
@@ -140,8 +140,8 @@ const RequirementsPage = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Solicitado por:</span>
-                            <span className="font-medium">{req.requestedBy}</span>
+                            <span className="text-muted-foreground">Por:</span>
+                            <span className="font-medium">{req.requestedBy.split(' - ')[0]}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -155,17 +155,19 @@ const RequirementsPage = () => {
                           )}
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-muted-foreground" />
-                            <Badge variant="outline">{CONTRACT_TYPES[req.contractType]?.name}</Badge>
+                            <Badge variant={CONTRACT_TYPES[req.contractType]?.variant || 'secondary'}>
+                              {CONTRACT_TYPES[req.contractType]?.name}
+                            </Badge>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
-                        <Badge style={{ backgroundColor: `${statusInfo.color}20`, color: statusInfo.color }}>
+                        <Badge variant="outline" className={statusInfo.className}>
                           {statusInfo.name}
                         </Badge>
-                        <Badge style={{ backgroundColor: `${priorityInfo.color}20`, color: priorityInfo.color }}>
-                          Prioridad {priorityInfo.name}
+                        <Badge variant="outline" className={priorityInfo.className}>
+                          {priorityInfo.name}
                         </Badge>
                       </div>
                     </div>
