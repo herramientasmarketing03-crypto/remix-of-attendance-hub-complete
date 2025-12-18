@@ -12,7 +12,12 @@ import DepartmentsPage from "./pages/DepartmentsPage";
 import ContractsPage from "./pages/ContractsPage";
 import RequirementsPage from "./pages/RequirementsPage";
 import RegulationsPage from "./pages/RegulationsPage";
-import { MessagesPage, UploadPage, ReportsPage, SettingsPage, PayrollPage } from "./pages/SimplePage";
+import MessagesPage from "./pages/MessagesPage";
+import UploadPage from "./pages/UploadPage";
+import ReportsPage from "./pages/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
+import PayrollPage from "./pages/PayrollPage";
+import VirtualAttendancePage from "./pages/VirtualAttendancePage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +33,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/virtual-attendance" element={<ProtectedRoute allowedRoles={['jefe_area', 'empleado']}><VirtualAttendancePage /></ProtectedRoute>} />
             <Route path="/attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
             <Route path="/messages" element={<ProtectedRoute><MessagesPage /></ProtectedRoute>} />
             <Route path="/regulations" element={<ProtectedRoute><RegulationsPage /></ProtectedRoute>} />
