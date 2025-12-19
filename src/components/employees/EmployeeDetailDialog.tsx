@@ -37,12 +37,16 @@ import {
   AlertCircle,
   History,
   ArrowLeft,
-  Scale
+  Scale,
+  FilePlus,
+  ArrowRightLeft,
+  Gift
 } from 'lucide-react';
-import { Employee, AttendanceRecord, DEPARTMENTS, EmployeeContract, Sanction } from '@/types/attendance';
-import { mockAttendanceRecords, mockContracts, mockSanctions, CONTRACT_TYPES } from '@/data/mockData';
+import { Employee, AttendanceRecord, DEPARTMENTS, EmployeeContract, Sanction, ContractAddendum } from '@/types/attendance';
+import { mockAttendanceRecords, mockContracts, mockSanctions, CONTRACT_TYPES, mockAddendums, ADDENDUM_TYPES } from '@/data/mockData';
 import { toast } from 'sonner';
 import { SanctionForm } from './SanctionForm';
+import { AddendumForm } from './AddendumForm';
 
 interface EmployeeDetailDialogProps {
   employee: Employee | null;
@@ -54,7 +58,9 @@ interface EmployeeDetailDialogProps {
 export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeUpdate }: EmployeeDetailDialogProps) {
   const [activeTab, setActiveTab] = useState('info');
   const [isAddingSanction, setIsAddingSanction] = useState(false);
+  const [isAddingAddendum, setIsAddingAddendum] = useState(false);
   const [localSanctions, setLocalSanctions] = useState<Sanction[]>([]);
+  const [localAddendums, setLocalAddendums] = useState<ContractAddendum[]>([]);
 
   const stats = useMemo(() => {
     if (!employee) return null;
@@ -94,6 +100,13 @@ export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeU
     const local = localSanctions.filter(s => s.employeeId === employee.id);
     return [...existing, ...local];
   }, [employee, localSanctions]);
+
+  const addendums = useMemo(() => {
+    if (!employee) return [];
+    const existing = mockAddendums.filter(a => a.employeeId === employee.id);
+    const local = localAddendums.filter(a => a.employeeId === employee.id);
+    return [...existing, ...local];
+  }, [employee, localAddendums]);
 
   if (!employee || !stats) return null;
 
@@ -149,6 +162,24 @@ export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeU
     setIsAddingSanction(false);
   };
 
+  const handleAddAddendum = () => {
+    setIsAddingAddendum(true);
+  };
+
+  const handleAddendumSubmit = (addendumData: Omit<ContractAddendum, 'id'>) => {
+    const newAddendum: ContractAddendum = {
+      ...addendumData,
+      id: `add-${Date.now()}`,
+    };
+    setLocalAddendums(prev => [...prev, newAddendum]);
+    setIsAddingAddendum(false);
+    toast.success('Adenda registrada correctamente');
+  };
+
+  const handleCancelAddendum = () => {
+    setIsAddingAddendum(false);
+  };
+
   const StatItem = ({ icon: Icon, label, value, color }: { icon: any; label: string; value: string | number; color?: string }) => (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
       <div className={`p-2 rounded-lg ${color || 'bg-primary/10'}`}>
@@ -168,13 +199,14 @@ export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeU
     <Dialog open={open} onOpenChange={(open) => {
       if (!open) {
         setIsAddingSanction(false);
+        setIsAddingAddendum(false);
       }
       onOpenChange(open);
     }}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>
-            {isAddingSanction ? 'Registrar Sanción' : 'Perfil del Empleado'}
+            {isAddingSanction ? 'Registrar Sanción' : isAddingAddendum ? 'Registrar Adenda' : 'Perfil del Empleado'}
           </DialogTitle>
         </DialogHeader>
 
@@ -204,6 +236,32 @@ export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeU
                   employee={employee}
                   onSubmit={handleSanctionSubmit}
                   onCancel={handleCancelSanction}
+                />
+              </motion.div>
+            ) : isAddingAddendum ? (
+              <motion.div
+                key="addendum-form"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center gap-3 pb-2">
+                  <Button variant="ghost" size="icon" onClick={handleCancelAddendum}>
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <FilePlus className="w-5 h-5 text-primary" />
+                      Registrar Adenda
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Modificación al contrato de {employee.name}</p>
+                  </div>
+                </div>
+                <AddendumForm
+                  employee={employee}
+                  onSubmit={handleAddendumSubmit}
+                  onCancel={handleCancelAddendum}
                 />
               </motion.div>
             ) : (

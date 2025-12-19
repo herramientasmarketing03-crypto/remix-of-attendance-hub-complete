@@ -169,3 +169,44 @@ export interface RegulationArticle {
   content: string;
   category: 'generalidades' | 'admision' | 'derechos_empleador' | 'derechos_colaborador' | 'jornada' | 'ausencias' | 'remuneraciones' | 'descansos' | 'faltas_sanciones';
 }
+
+export type AddendumType = 'salary_increase' | 'position_change' | 'schedule_change' | 'contract_extension' | 'benefits' | 'other';
+
+export interface ContractAddendum {
+  id: string;
+  contractId: string;
+  employeeId: string;
+  type: AddendumType;
+  description: string;
+  effectiveDate: string;
+  previousValue?: string;
+  newValue?: string;
+  createdAt: string;
+  createdBy: string;
+  status: 'active' | 'pending' | 'revoked';
+}
+
+export interface VacationRequest {
+  id: string;
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export interface Permission {
+  id: string;
+  employeeId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+  type: 'personal' | 'medical' | 'academic' | 'family' | 'other';
+  status: 'pending' | 'approved' | 'rejected';
+  evidenceUrl?: string;
+}

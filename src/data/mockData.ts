@@ -1,4 +1,4 @@
-import { Employee, AttendanceRecord, AttendanceMessage, Department, DepartmentStats, UploadedReport, EmployeeContract, PersonnelRequirement, Sanction, RegulationArticle } from '@/types/attendance';
+import { Employee, AttendanceRecord, AttendanceMessage, Department, DepartmentStats, UploadedReport, EmployeeContract, PersonnelRequirement, Sanction, RegulationArticle, ContractAddendum, VacationRequest, Permission } from '@/types/attendance';
 
 export const mockEmployees: Employee[] = [
   { id: '1', documentId: '75670401', name: 'Aracely Reque', department: 'comercial', position: 'Ejecutiva de Ventas', email: 'aracely.reque@empresa.com', phone: '987654321', hireDate: '2023-03-15', contractType: 'indefinido', status: 'active' },
@@ -250,3 +250,103 @@ export const PRIORITY_LEVELS: Record<string, { name: string; className: string }
   media: { name: 'Media', className: 'bg-warning/10 text-warning border-warning/20' },
   baja: { name: 'Baja', className: 'bg-success/10 text-success border-success/20' },
 };
+
+export const ADDENDUM_TYPES: Record<string, { name: string; icon: string }> = {
+  salary_increase: { name: 'Aumento de Salario', icon: 'dollar-sign' },
+  position_change: { name: 'Cambio de Cargo', icon: 'briefcase' },
+  schedule_change: { name: 'Cambio de Horario', icon: 'clock' },
+  contract_extension: { name: 'Extensión de Contrato', icon: 'calendar' },
+  benefits: { name: 'Beneficios', icon: 'gift' },
+  other: { name: 'Otro', icon: 'file-text' },
+};
+
+export const mockAddendums: ContractAddendum[] = [
+  {
+    id: 'add1',
+    contractId: 'c1',
+    employeeId: '1',
+    type: 'salary_increase',
+    description: 'Aumento salarial por desempeño sobresaliente en el período 2024',
+    effectiveDate: '2024-07-01',
+    previousValue: 'S/. 2,200',
+    newValue: 'S/. 2,500',
+    createdAt: '2024-06-15T10:00:00Z',
+    createdBy: 'RRHH',
+    status: 'active',
+  },
+  {
+    id: 'add2',
+    contractId: 'c4',
+    employeeId: '4',
+    type: 'position_change',
+    description: 'Promoción a Desarrollador Senior',
+    effectiveDate: '2024-09-01',
+    previousValue: 'Desarrollador Frontend',
+    newValue: 'Desarrollador Senior',
+    createdAt: '2024-08-20T14:00:00Z',
+    createdBy: 'Jefe TI',
+    status: 'active',
+  },
+  {
+    id: 'add3',
+    contractId: 'c2',
+    employeeId: '2',
+    type: 'contract_extension',
+    description: 'Extensión del contrato por 6 meses adicionales',
+    effectiveDate: '2025-01-10',
+    previousValue: '2025-01-10',
+    newValue: '2025-07-10',
+    createdAt: '2024-12-01T09:00:00Z',
+    createdBy: 'RRHH',
+    status: 'pending',
+  },
+];
+
+export const mockVacations: VacationRequest[] = [
+  {
+    id: 'v1',
+    employeeId: '3',
+    startDate: '2025-01-15',
+    endDate: '2025-01-30',
+    days: 15,
+    reason: 'Vacaciones anuales',
+    status: 'approved',
+    requestedAt: '2024-12-01T10:00:00Z',
+    approvedBy: 'RRHH',
+    approvedAt: '2024-12-05T14:00:00Z',
+  },
+  {
+    id: 'v2',
+    employeeId: '6',
+    startDate: '2025-02-01',
+    endDate: '2025-02-08',
+    days: 7,
+    reason: 'Viaje familiar',
+    status: 'pending',
+    requestedAt: '2024-12-10T09:00:00Z',
+  },
+];
+
+export const mockPermissions: Permission[] = [
+  {
+    id: 'p1',
+    employeeId: '5',
+    date: '2024-12-15',
+    startTime: '09:00',
+    endTime: '12:00',
+    reason: 'Cita médica',
+    type: 'medical',
+    status: 'approved',
+    evidenceUrl: '/evidence/medical-cert.pdf',
+  },
+  {
+    id: 'p2',
+    employeeId: '8',
+    date: '2024-12-18',
+    startTime: '14:00',
+    endTime: '18:00',
+    reason: 'Trámites personales',
+    type: 'personal',
+    status: 'pending',
+  },
+];
