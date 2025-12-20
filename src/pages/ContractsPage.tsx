@@ -5,15 +5,32 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
-import { FileCheck, Search, Plus, AlertTriangle, DollarSign, User } from 'lucide-react';
+import { FileCheck, Search, Plus, AlertTriangle, DollarSign, User, Eye, RefreshCw, FileText } from 'lucide-react';
 import { mockContracts, mockEmployees, CONTRACT_TYPES } from '@/data/mockData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DEPARTMENTS } from '@/types/attendance';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ContractsPage = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [newContractOpen, setNewContractOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<any>(null);
+
+  const handleCreateContract = () => {
+    toast.success('Contrato creado correctamente');
+    setNewContractOpen(false);
+  };
+
+  const handleRenewContract = (contract: any) => {
+    toast.success(`Contrato de ${contract.employee?.name} renovado`);
+    setDetailOpen(false);
+  };
 
   const contractsWithEmployee = mockContracts.map(contract => {
     const employee = mockEmployees.find(e => e.id === contract.employeeId);
@@ -47,10 +64,146 @@ const ContractsPage = () => {
             <h1 className="text-2xl font-bold">Contratos</h1>
             <p className="text-muted-foreground">Gestión de contratos laborales</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground">
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo Contrato
-          </Button>
+          <Dialog open={newContractOpen} onOpenChange={setNewContractOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Contrato
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Contrato</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Empleado</Label>
+                  <Select>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
+                    <SelectContent>
+                      {mockEmployees.map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tipo de Contrato</Label>
+                    <Select>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CONTRACT_TYPES).map(([key, type]) => (
+                          <SelectItem key={key} value={key}>{type.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departamento</Label>
+                    <Select>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(DEPARTMENTS).map(([key, dept]) => (
+                          <SelectItem key={key} value={key}>{dept.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Cargo</Label>
+                  <Input placeholder="Ej: Desarrollador Senior" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Fecha Inicio</Label>
+                    <Input type="date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fecha Fin</Label>
+                    <Input type="date" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Salario (S/.)</Label>
+                  <Input type="number" placeholder="0.00" />
+                </div>
+                <Button className="w-full gradient-primary text-primary-foreground" onClick={handleCreateContract}>
+                  Crear Contrato
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Contract Detail Dialog */}
+          <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Detalle del Contrato</DialogTitle>
+              </DialogHeader>
+              {selectedContract && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-primary/10">
+                      <FileText className="w-8 h-8 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold">{selectedContract.employee?.name}</h3>
+                      <p className="text-muted-foreground">{selectedContract.position}</p>
+                    </div>
+                    {getStatusBadge(selectedContract.status)}
+                  </div>
+
+                  <Tabs defaultValue="info" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="info">Información</TabsTrigger>
+                      <TabsTrigger value="actions">Acciones</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="info" className="space-y-4 pt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground mb-1">Tipo de Contrato</p>
+                          <p className="font-medium">{CONTRACT_TYPES[selectedContract.type]?.name}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground mb-1">Departamento</p>
+                          <p className="font-medium">{DEPARTMENTS[selectedContract.department]?.name}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground mb-1">Fecha de Inicio</p>
+                          <p className="font-medium">{selectedContract.startDate}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted/50">
+                          <p className="text-xs text-muted-foreground mb-1">Fecha de Fin</p>
+                          <p className="font-medium">{selectedContract.endDate || 'Indefinido'}</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-muted/50 col-span-2">
+                          <p className="text-xs text-muted-foreground mb-1">Salario Mensual</p>
+                          <p className="text-2xl font-bold text-primary">S/. {selectedContract.salary.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </TabsContent>
+                    <TabsContent value="actions" className="space-y-4 pt-4">
+                      <div className="grid gap-3">
+                        <Button variant="outline" className="w-full justify-start" onClick={() => handleRenewContract(selectedContract)}>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Renovar Contrato
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start">
+                          <FileText className="w-4 h-4 mr-2" />
+                          Generar Adenda
+                        </Button>
+                        <Button variant="destructive" className="w-full justify-start">
+                          Finalizar Contrato
+                        </Button>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </motion.div>
 
         {expiringContracts.length > 0 && (
@@ -110,11 +263,12 @@ const ContractsPage = () => {
                     <TableHead>Fin</TableHead>
                     <TableHead>Salario</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredContracts.map((contract, index) => (
-                    <motion.tr key={contract.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.02 }} className="hover:bg-muted/30">
+                    <motion.tr key={contract.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.02 }} className="hover:bg-muted/30 cursor-pointer" onClick={() => { setSelectedContract(contract); setDetailOpen(true); }}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4 text-muted-foreground" />
@@ -139,6 +293,11 @@ const ContractsPage = () => {
                         </div>
                       </TableCell>
                       <TableCell>{getStatusBadge(contract.status)}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </motion.tr>
                   ))}
                 </TableBody>
