@@ -21,6 +21,13 @@ import PayrollPage from "./pages/PayrollPage";
 import VirtualAttendancePage from "./pages/VirtualAttendancePage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
+import AgendaPage from "./pages/AgendaPage";
+import PersonnelDatabasePage from "./pages/PersonnelDatabasePage";
+import JustificationsPage from "./pages/JustificationsPage";
+import TaskTrackerPage from "./pages/TaskTrackerPage";
+import InventoryPage from "./pages/InventoryPage";
+import PerformancePage from "./pages/PerformancePage";
+import TerminationPage from "./pages/TerminationPage";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +54,13 @@ const App = () => (
             <Route path="/upload" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><UploadPage /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><ReportsPage /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><SettingsPage /></ProtectedRoute>} />
+            <Route path="/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
+            <Route path="/personnel-database" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><PersonnelDatabasePage /></ProtectedRoute>} />
+            <Route path="/justifications" element={<ProtectedRoute><JustificationsPage /></ProtectedRoute>} />
+            <Route path="/task-tracker" element={<ProtectedRoute><TaskTrackerPage /></ProtectedRoute>} />
+            <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><InventoryPage /></ProtectedRoute>} />
+            <Route path="/performance" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><PerformancePage /></ProtectedRoute>} />
+            <Route path="/termination" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><TerminationPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
