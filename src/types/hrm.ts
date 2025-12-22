@@ -75,24 +75,57 @@ export interface JustificationRequest {
   status: 'pending' | 'jefe_approved' | 'rrhh_approved' | 'rejected';
 }
 
-// Tracker de tareas
-export type TaskPriority = 'alta' | 'media' | 'baja';
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+// Tracker de tareas - Modelo completo
+export interface TaskStatus {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  order: number;
+}
+
+export interface TaskPriority {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+  order: number;
+}
+
+export interface TaskCategory {
+  id: string;
+  name: string;
+  color: string;
+  order: number;
+}
+
+export interface TaskResponsible {
+  id: string;
+  name: string;
+  avatar?: string;
+}
 
 export interface Task {
   id: string;
   title: string;
   description: string;
   assignedTo: string;
+  assignedToName: string;
   assignedBy: string;
   department?: Department;
-  priority: TaskPriority;
-  status: TaskStatus;
+  priorityId: string;
+  statusId: string;
+  categoryId: string;
   dueDate?: string;
   createdAt: string;
   completedAt?: string;
-  tags?: string[];
+  link?: string;
+  isCompleted: boolean;
 }
+
+// Legacy types for backwards compatibility
+export type TaskPriorityLegacy = 'alta' | 'media' | 'baja';
+export type TaskStatusLegacy = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
 // Plan de trabajo
 export interface WorkPlan {
