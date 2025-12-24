@@ -28,6 +28,9 @@ import TaskTrackerPage from "./pages/TaskTrackerPage";
 import InventoryPage from "./pages/InventoryPage";
 import PerformancePage from "./pages/PerformancePage";
 import TerminationPage from "./pages/TerminationPage";
+import SanctionsPage from "./pages/SanctionsPage";
+import LeaveRequestsPage from "./pages/LeaveRequestsPage";
+import AuditLogPage from "./pages/AuditLogPage";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +64,9 @@ const App = () => (
             <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><InventoryPage /></ProtectedRoute>} />
             <Route path="/performance" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><PerformancePage /></ProtectedRoute>} />
             <Route path="/termination" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><TerminationPage /></ProtectedRoute>} />
+            <Route path="/sanctions" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><SanctionsPage /></ProtectedRoute>} />
+            <Route path="/leave-requests" element={<ProtectedRoute><LeaveRequestsPage /></ProtectedRoute>} />
+            <Route path="/audit-log" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><AuditLogPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

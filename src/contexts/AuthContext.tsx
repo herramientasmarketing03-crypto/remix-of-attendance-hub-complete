@@ -30,11 +30,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo users for testing
+// Demo users for testing with dynamic linking
 const DEMO_USERS = {
-  'admin@empresa.com': { role: 'admin_rrhh' as AppRole, nombres: 'María', apellidos: 'García' },
-  'jefe@empresa.com': { role: 'jefe_area' as AppRole, nombres: 'Carlos', apellidos: 'Ruiz' },
-  'empleado@empresa.com': { role: 'empleado' as AppRole, nombres: 'Juan', apellidos: 'Pérez' },
+  'admin@empresa.com': { role: 'admin_rrhh' as AppRole, nombres: 'María', apellidos: 'García', area_id: null, employeeId: null },
+  'jefe@empresa.com': { role: 'jefe_area' as AppRole, nombres: 'Carlos', apellidos: 'Ruiz', area_id: 'ti', employeeId: '6' },
+  'empleado@empresa.com': { role: 'empleado' as AppRole, nombres: 'Christian', apellidos: 'Maldon', area_id: 'ti', employeeId: '4' },
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nombres: demoUser.nombres,
           apellidos: demoUser.apellidos,
         };
-        const newRole = { role: demoUser.role, area_id: null };
+        const newRole = { role: demoUser.role, area_id: demoUser.area_id };
         
         setUser(newUser);
         setUserRole(newRole);
