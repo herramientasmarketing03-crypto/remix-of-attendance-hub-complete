@@ -22,6 +22,9 @@ import {
   Package,
   TrendingUp,
   UserMinus,
+  Scale,
+  Palmtree,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -51,10 +54,13 @@ const allMenuItems: MenuItem[] = [
   { icon: Wallet, label: 'Boletas de Pago', path: '/payroll' },
   { icon: UserPlus, label: 'Requerimientos', path: '/requirements', roles: ['admin_rrhh', 'jefe_area'] },
   { icon: TrendingUp, label: 'Rendimiento', path: '/performance', roles: ['admin_rrhh', 'jefe_area'] },
+  { icon: Scale, label: 'Sanciones', path: '/sanctions', roles: ['admin_rrhh', 'jefe_area'] },
+  { icon: Palmtree, label: 'Permisos/Vacaciones', path: '/leave-requests' },
   { icon: Package, label: 'Inventario', path: '/inventory', roles: ['admin_rrhh'] },
   { icon: UserMinus, label: 'Retiro Personal', path: '/termination', roles: ['admin_rrhh'] },
   { icon: MessageSquare, label: 'Mensajes', path: '/messages' },
   { icon: BarChart3, label: 'Reportes', path: '/reports', roles: ['admin_rrhh'] },
+  { icon: Shield, label: 'Auditoría', path: '/audit-log', roles: ['admin_rrhh'] },
   { icon: Book, label: 'Reglamento', path: '/regulations' },
   { icon: Settings, label: 'Configuración', path: '/settings', roles: ['admin_rrhh'] },
 ];
