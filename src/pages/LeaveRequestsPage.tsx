@@ -57,7 +57,7 @@ const PERMISSION_TYPES = {
 };
 
 export default function LeaveRequestsPage() {
-  const { isAdmin, isJefe, isEmpleado, user, userRole } = useAuth();
+  const { isAdmin, isJefe, isEmpleado, user, userRole, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'vacations' | 'permissions'>('vacations');
   const [selectedVacation, setSelectedVacation] = useState<ExtendedVacation | null>(null);
   const [selectedPermission, setSelectedPermission] = useState<ExtendedPermission | null>(null);
@@ -130,7 +130,7 @@ export default function LeaveRequestsPage() {
         return { 
           ...v, 
           approvalFlow: 'jefe_approved' as ApprovalFlow,
-          jefeApprovedBy: `${user?.nombres} ${user?.apellidos}`,
+          jefeApprovedBy: `${profile?.nombres} ${profile?.apellidos}`,
           jefeApprovedAt: new Date().toISOString()
         };
       }
@@ -140,7 +140,7 @@ export default function LeaveRequestsPage() {
           ...v, 
           approvalFlow: 'rrhh_approved' as ApprovalFlow, 
           status: 'approved',
-          approvedBy: `${user?.nombres} ${user?.apellidos}`,
+          approvedBy: `${profile?.nombres} ${profile?.apellidos}`,
           approvedAt: new Date().toISOString()
         };
       }
@@ -153,7 +153,7 @@ export default function LeaveRequestsPage() {
       'vacation', 
       vacation.id, 
       user?.id || '', 
-      `${user?.nombres} ${user?.apellidos}`,
+      `${profile?.nombres} ${profile?.apellidos}`,
       `${action === 'approve' ? 'Aprobó' : 'Rechazó'} vacaciones de ${employee?.name}`
     );
 
@@ -175,7 +175,7 @@ export default function LeaveRequestsPage() {
         return { 
           ...p, 
           approvalFlow: 'jefe_approved' as ApprovalFlow,
-          jefeApprovedBy: `${user?.nombres} ${user?.apellidos}`,
+          jefeApprovedBy: `${profile?.nombres} ${profile?.apellidos}`,
           jefeApprovedAt: new Date().toISOString()
         };
       }
@@ -196,7 +196,7 @@ export default function LeaveRequestsPage() {
       'permission', 
       permission.id, 
       user?.id || '', 
-      `${user?.nombres} ${user?.apellidos}`,
+      `${profile?.nombres} ${profile?.apellidos}`,
       `${action === 'approve' ? 'Aprobó' : 'Rechazó'} permiso de ${employee?.name}`
     );
 

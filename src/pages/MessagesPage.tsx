@@ -47,7 +47,7 @@ const MESSAGE_CATEGORIES: Record<MessageCategory, { label: string; icon: typeof 
 type RecipientType = 'employee' | 'rrhh' | 'jefe' | 'gerencia';
 
 const MessagesPage = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [messages, setMessages] = useState<ExtendedMessage[]>(() => 
     loadFromStorage(STORAGE_KEYS.MESSAGES, mockMessages)
   );
@@ -72,7 +72,7 @@ const MessagesPage = () => {
   const [replyText, setReplyText] = useState('');
 
   const currentUserId = user?.id || 'current-user';
-  const currentUserName = `${user?.nombres || 'Usuario'} ${user?.apellidos || ''}`.trim();
+  const currentUserName = `${profile?.nombres || 'Usuario'} ${profile?.apellidos || ''}`.trim();
 
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.MESSAGES, messages);
