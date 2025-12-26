@@ -17,6 +17,9 @@ export type Database = {
       attendance_records: {
         Row: {
           absences: number | null
+          break_end: string | null
+          break_minutes: number | null
+          break_start: string | null
           check_in: string | null
           check_out: string | null
           created_at: string | null
@@ -35,6 +38,9 @@ export type Database = {
         }
         Insert: {
           absences?: number | null
+          break_end?: string | null
+          break_minutes?: number | null
+          break_start?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string | null
@@ -53,6 +59,9 @@ export type Database = {
         }
         Update: {
           absences?: number | null
+          break_end?: string | null
+          break_minutes?: number | null
+          break_start?: string | null
           check_in?: string | null
           check_out?: string | null
           created_at?: string | null
@@ -142,6 +151,7 @@ export type Database = {
           category: string
           completed_at: string | null
           created_at: string
+          created_by_user_id: string | null
           description: string | null
           due_date: string | null
           employee_id: string | null
@@ -159,6 +169,7 @@ export type Database = {
           category?: string
           completed_at?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           description?: string | null
           due_date?: string | null
           employee_id?: string | null
@@ -176,6 +187,7 @@ export type Database = {
           category?: string
           completed_at?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           description?: string | null
           due_date?: string | null
           employee_id?: string | null
@@ -206,6 +218,7 @@ export type Database = {
           department: string
           document_id: string
           email: string | null
+          employee_code: string | null
           hire_date: string | null
           id: string
           name: string
@@ -223,6 +236,7 @@ export type Database = {
           department: string
           document_id: string
           email?: string | null
+          employee_code?: string | null
           hire_date?: string | null
           id?: string
           name: string
@@ -240,6 +254,7 @@ export type Database = {
           department?: string
           document_id?: string
           email?: string | null
+          employee_code?: string | null
           hire_date?: string | null
           id?: string
           name?: string
@@ -502,6 +517,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      position_manuals: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          department: string
+          description: string | null
+          file_url: string | null
+          id: string
+          position: string
+          requirements: string | null
+          responsibilities: Json | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          department: string
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          position: string
+          requirements?: string | null
+          responsibilities?: Json | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          department?: string
+          description?: string | null
+          file_url?: string | null
+          id?: string
+          position?: string
+          requirements?: string | null
+          responsibilities?: Json | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,11 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useEmployeeTasks, type EmployeeTask } from '@/hooks/useEmployeeTasks';
+import { useEmployeeTasks, type EmployeeTask, type TaskUpdate } from '@/hooks/useEmployeeTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ListTodo, 
-  LayoutDashboard, 
   Calendar as CalendarIcon, 
   Plus,
   CheckCircle2,
@@ -26,9 +25,13 @@ import {
   ExternalLink,
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Filter,
+  X,
+  Pencil,
+  Trash2
 } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, getDay, addMonths, subMonths, differenceInDays } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isToday, getDay, addMonths, subMonths, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -56,7 +59,7 @@ const PIE_COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#f97316', '#ef4444'];
 
 export default function TaskTrackerPage() {
   const { userRole, user, profile } = useAuth();
-  const { tasks, loading, stats, createTask, updateTask, toggleComplete } = useEmployeeTasks();
+  const { tasks, loading, stats, createTask, updateTask, toggleComplete, deleteTask } = useEmployeeTasks();
   const [activeTab, setActiveTab] = useState('seguimiento');
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -72,9 +75,58 @@ export default function TaskTrackerPage() {
     notes: '',
   });
 
+  // Advanced filters
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [filterAssignee, setFilterAssignee] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Edit task state
+  const [editingTask, setEditingTask] = useState<EmployeeTask | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState<TaskUpdate>({});
+
   const isAdmin = userRole?.role === 'admin_rrhh';
   const isJefe = userRole?.role === 'jefe_area';
   const canManage = isAdmin || isJefe;
+  const currentUserName = `${profile?.nombres || ''} ${profile?.apellidos || ''}`.trim();
+
+  // Get unique assignees for filter
+  const uniqueAssignees = useMemo(() => {
+    return [...new Set(tasks.map(t => t.assigned_to))].sort();
+  }, [tasks]);
+
+  // Check if user can edit a specific task
+  const canEditTask = (task: EmployeeTask) => {
+    if (isAdmin || isJefe) return true;
+    // Employees can edit tasks they created (assigned_by matches their name)
+    return task.assigned_by === currentUserName;
+  };
+
+  // Check if user can only change status (not full edit)
+  const canOnlyChangeStatus = (task: EmployeeTask) => {
+    if (isAdmin || isJefe) return false;
+    // If employee didn't create the task, they can only change status
+    return task.assigned_by !== currentUserName;
+  };
+
+  // Filtered tasks
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      if (filterCategory !== 'all' && task.category !== filterCategory) return false;
+      if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
+      if (filterAssignee !== 'all' && task.assigned_to !== filterAssignee) return false;
+      return true;
+    });
+  }, [tasks, filterCategory, filterPriority, filterAssignee]);
+
+  const hasActiveFilters = filterCategory !== 'all' || filterPriority !== 'all' || filterAssignee !== 'all';
+
+  const clearFilters = () => {
+    setFilterCategory('all');
+    setFilterPriority('all');
+    setFilterAssignee('all');
+  };
 
   const handleCreateTask = async () => {
     if (!newTask.title) {
@@ -87,7 +139,7 @@ export default function TaskTrackerPage() {
         title: newTask.title,
         description: newTask.description || null,
         assigned_to: newTask.assigned_to,
-        assigned_by: `${profile?.nombres || ''} ${profile?.apellidos || ''}`.trim(),
+        assigned_by: currentUserName,
         priority: newTask.priority,
         status: newTask.status,
         category: newTask.category,
@@ -114,6 +166,38 @@ export default function TaskTrackerPage() {
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     await updateTask(taskId, { status: newStatus });
+  };
+
+  const openEditDialog = (task: EmployeeTask) => {
+    setEditingTask(task);
+    setEditForm({
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      category: task.category,
+      due_date: task.due_date,
+      link: task.link,
+      notes: task.notes,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditTask = async () => {
+    if (!editingTask) return;
+    try {
+      await updateTask(editingTask.id, editForm);
+      setIsEditOpen(false);
+      setEditingTask(null);
+      toast.success('Tarea actualizada');
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (confirm('¿Estás seguro de eliminar esta tarea?')) {
+      await deleteTask(taskId);
+    }
   };
 
   // Prepare chart data
@@ -182,7 +266,21 @@ export default function TaskTrackerPage() {
             </p>
           </div>
           
-          {canManage && (
+          <div className="flex gap-2">
+            <Button 
+              variant={showFilters ? "default" : "outline"} 
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="w-4 h-4" />
+              Filtros
+              {hasActiveFilters && (
+                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
+                  !
+                </Badge>
+              )}
+            </Button>
+            
             <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -267,8 +365,73 @@ export default function TaskTrackerPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          )}
+          </div>
         </div>
+
+        {/* Advanced Filters */}
+        {showFilters && (
+          <Card className="bg-muted/30">
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Categoría:</Label>
+                  <Select value={filterCategory} onValueChange={setFilterCategory}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {CATEGORY_OPTIONS.map(c => (
+                        <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Prioridad:</Label>
+                  <Select value={filterPriority} onValueChange={setFilterPriority}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Responsable:</Label>
+                  <Select value={filterAssignee} onValueChange={setFilterAssignee}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {uniqueAssignees.map(a => (
+                        <SelectItem key={a} value={a}>{a}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                    <X className="w-4 h-4" />
+                    Limpiar
+                  </Button>
+                )}
+
+                <div className="ml-auto text-sm text-muted-foreground">
+                  Mostrando {filteredTasks.length} de {tasks.length} tareas
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -380,18 +543,21 @@ export default function TaskTrackerPage() {
                         <TableHead>ACTIVIDAD</TableHead>
                         <TableHead>ESTADO</TableHead>
                         <TableHead>FECHA LÍMITE</TableHead>
-                        <TableHead>DÍAS RESTANTES</TableHead>
+                        <TableHead>DÍAS</TableHead>
                         <TableHead>PRIORIDAD</TableHead>
                         <TableHead>CATEGORÍA</TableHead>
                         <TableHead>RESPONSABLE</TableHead>
                         <TableHead>NOTAS</TableHead>
                         <TableHead>ENLACE</TableHead>
+                        <TableHead className="w-20">ACCIONES</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tasks.map((task) => {
+                      {filteredTasks.map((task) => {
                         const daysRemaining = getDaysRemaining(task.due_date);
                         const StatusIcon = STATUS_CONFIG[task.status]?.icon || Clock;
+                        const taskCanEdit = canEditTask(task);
+                        const onlyStatus = canOnlyChangeStatus(task);
                         
                         return (
                           <TableRow key={task.id} className={task.status === 'completed' ? 'opacity-60' : ''}>
@@ -405,6 +571,9 @@ export default function TaskTrackerPage() {
                               <span className={task.status === 'completed' ? 'line-through' : ''}>
                                 {task.title}
                               </span>
+                              {task.assigned_by && (
+                                <p className="text-xs text-muted-foreground">Por: {task.assigned_by}</p>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Select 
@@ -455,6 +624,30 @@ export default function TaskTrackerPage() {
                                   <ExternalLink className="w-4 h-4 text-primary hover:text-primary/80" />
                                 </a>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {taskCanEdit && !onlyStatus && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => openEditDialog(task)}
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </Button>
+                                )}
+                                {taskCanEdit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => handleDeleteTask(task.id)}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -615,6 +808,77 @@ export default function TaskTrackerPage() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Editar Tarea</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label>Actividad</Label>
+                <Input 
+                  value={editForm.title || ''}
+                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                />
+              </div>
+              <div>
+                <Label>Notas</Label>
+                <Textarea 
+                  value={editForm.notes || ''}
+                  onChange={(e) => setEditForm({...editForm, notes: e.target.value})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Fecha Límite</Label>
+                  <Input 
+                    type="date"
+                    value={editForm.due_date || ''}
+                    onChange={(e) => setEditForm({...editForm, due_date: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label>Prioridad</Label>
+                  <Select value={editForm.priority || 'medium'} onValueChange={(v) => setEditForm({...editForm, priority: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Categoría</Label>
+                  <Select value={editForm.category || 'general'} onValueChange={(v) => setEditForm({...editForm, category: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORY_OPTIONS.map(c => (
+                        <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Enlace</Label>
+                  <Input 
+                    value={editForm.link || ''}
+                    onChange={(e) => setEditForm({...editForm, link: e.target.value})}
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+              <Button onClick={handleEditTask}>Guardar Cambios</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

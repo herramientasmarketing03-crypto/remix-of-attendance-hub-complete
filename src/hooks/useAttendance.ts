@@ -8,6 +8,9 @@ export interface AttendanceRecord {
   date: string;
   check_in: string | null;
   check_out: string | null;
+  break_start: string | null;
+  break_end: string | null;
+  break_minutes: number;
   worked_hours: number;
   tardy_minutes: number;
   tardy_count: number;
