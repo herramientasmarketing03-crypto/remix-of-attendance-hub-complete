@@ -21,7 +21,8 @@ export type AuditEntity =
   | 'attendance'
   | 'evaluation'
   | 'task'
-  | 'user';
+  | 'user'
+  | 'message';
 
 export interface AuditLogEntry {
   id: string;
