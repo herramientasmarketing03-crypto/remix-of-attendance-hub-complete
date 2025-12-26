@@ -1,40 +1,36 @@
 import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockJustifications, JUSTIFICATION_STATUS } from '@/data/hrmData';
-import { JustificationRequest } from '@/types/hrm';
+import { useJustifications } from '@/hooks/useJustifications';
 import { 
-  FileCheck, 
-  Search, 
-  Plus, 
-  CheckCircle, 
-  XCircle, 
-  Clock,
-  FileText,
-  ShieldCheck,
-  Eye,
-  Upload
+  FileCheck, Search, Plus, CheckCircle, XCircle, Clock, FileText, ShieldCheck, Eye, Upload, Loader2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
+const JUSTIFICATION_STATUS: Record<string, { name: string; className: string }> = {
+  pending: { name: 'Pendiente', className: 'bg-warning/10 text-warning' },
+  approved: { name: 'Aprobado', className: 'bg-success/10 text-success' },
+  rejected: { name: 'Rechazado', className: 'bg-destructive/10 text-destructive' },
+};
+
 export default function JustificationsPage() {
-  const { userRole } = useAuth();
-  const [justifications, setJustifications] = useState<JustificationRequest[]>(mockJustifications);
+  const { userRole, profile, user } = useAuth();
+  const { justifications, loading, approveByJefe, approveByRRHH, reject } = useJustifications();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedJustification, setSelectedJustification] = useState<JustificationRequest | null>(null);
+  const [selectedJustification, setSelectedJustification] = useState<typeof justifications[0] | null>(null);
+  const [isNewOpen, setIsNewOpen] = useState(false);
   const [isNewOpen, setIsNewOpen] = useState(false);
 
   const isAdmin = userRole?.role === 'admin_rrhh';

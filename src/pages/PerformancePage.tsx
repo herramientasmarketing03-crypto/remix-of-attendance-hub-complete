@@ -10,10 +10,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockEmployeePerformance, CLASSIFICATION_COLORS } from '@/data/hrmData';
-import { mockEmployees } from '@/data/mockData';
+import { usePerformance, KPI } from '@/hooks/usePerformance';
+import { useEmployees } from '@/hooks/useEmployees';
 import { DEPARTMENTS } from '@/types/attendance';
-import { EmployeePerformance } from '@/types/hrm';
 import { 
   TrendingUp, 
   Search, 
@@ -21,32 +20,52 @@ import {
   Award,
   Target,
   Eye,
-  BarChart3,
   Users,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+const CLASSIFICATION_COLORS: Record<string, { label: string; className: string; description: string }> = {
+  A: { label: 'Clase A - Excepcional', className: 'bg-success/10 text-success', description: 'Rendimiento excepcional, supera las expectativas en todas las áreas.' },
+  B: { label: 'Clase B - Bueno', className: 'bg-info/10 text-info', description: 'Buen rendimiento, cumple y ocasionalmente supera las expectativas.' },
+  C: { label: 'Clase C - Regular', className: 'bg-warning/10 text-warning', description: 'Rendimiento regular, cumple con lo mínimo esperado.' },
+  D: { label: 'Clase D - Requiere Mejora', className: 'bg-destructive/10 text-destructive', description: 'Rendimiento por debajo de lo esperado, requiere plan de mejora.' },
+};
+
 export default function PerformancePage() {
-  const [performances] = useState<EmployeePerformance[]>(mockEmployeePerformance);
+  const { evaluations, loading: loadingEvaluations } = usePerformance();
+  const { employees, loading: loadingEmployees } = useEmployees();
   const [search, setSearch] = useState('');
   const [filterClassification, setFilterClassification] = useState<string>('all');
-  const [selectedPerformance, setSelectedPerformance] = useState<EmployeePerformance | null>(null);
+  const [selectedEvaluation, setSelectedEvaluation] = useState<typeof evaluations[0] | null>(null);
 
-  const getEmployee = (employeeId: string) => mockEmployees.find(e => e.id === employeeId);
+  const loading = loadingEvaluations || loadingEmployees;
 
-  const filteredPerformances = performances.filter(p => {
-    const employee = getEmployee(p.employeeId);
+  const getEmployee = (employeeId: string) => employees.find(e => e.id === employeeId);
+
+  const filteredEvaluations = evaluations.filter(e => {
+    const employee = getEmployee(e.employee_id);
     const matchesSearch = employee?.name.toLowerCase().includes(search.toLowerCase()) ?? false;
-    const matchesClassification = filterClassification === 'all' || p.classification === filterClassification;
+    const matchesClassification = filterClassification === 'all' || e.classification === filterClassification;
     return matchesSearch && matchesClassification;
   });
 
-  const classACount = performances.filter(p => p.classification === 'A').length;
-  const classBCount = performances.filter(p => p.classification === 'B').length;
-  const classCCount = performances.filter(p => p.classification === 'C').length;
-  const eligibleForBonus = performances.filter(p => p.bonusCondition === 'eligible').length;
+  const classACount = evaluations.filter(e => e.classification === 'A').length;
+  const classBCount = evaluations.filter(e => e.classification === 'B').length;
+  const classCCount = evaluations.filter(e => e.classification === 'C').length;
+  const eligibleForBonus = evaluations.filter(e => e.bonus_condition === 'eligible').length;
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -151,87 +170,93 @@ export default function PerformancePage() {
         {/* Table */}
         <Card>
           <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Empleado</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Clasificación</TableHead>
-                  <TableHead>Puntuación</TableHead>
-                  <TableHead>Bono</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPerformances.map((performance) => {
-                  const employee = getEmployee(performance.employeeId);
-                  if (!employee) return null;
+            {filteredEvaluations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay evaluaciones de desempeño
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Departamento</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead>Clasificación</TableHead>
+                    <TableHead>Puntuación</TableHead>
+                    <TableHead>Bono</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEvaluations.map((evaluation) => {
+                    const employee = getEmployee(evaluation.employee_id);
+                    if (!employee) return null;
 
-                  return (
-                    <TableRow key={performance.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                              {employee.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{employee.name}</p>
-                            <p className="text-xs text-muted-foreground">{employee.position}</p>
+                    return (
+                      <TableRow key={evaluation.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                                {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{employee.name}</p>
+                              <p className="text-xs text-muted-foreground">{employee.position}</p>
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{DEPARTMENTS[employee.department].name}</Badge>
-                      </TableCell>
-                      <TableCell>{performance.period}</TableCell>
-                      <TableCell>
-                        <Badge className={CLASSIFICATION_COLORS[performance.classification].className}>
-                          {CLASSIFICATION_COLORS[performance.classification].label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={performance.overallScore} className="w-20 h-2" />
-                          <span className="text-sm font-medium">{performance.overallScore}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={
-                          performance.bonusCondition === 'eligible' ? 'bg-success/10 text-success' :
-                          performance.bonusCondition === 'pending_review' ? 'bg-warning/10 text-warning' :
-                          'bg-muted text-muted-foreground'
-                        }>
-                          {performance.bonusCondition === 'eligible' && 'Elegible'}
-                          {performance.bonusCondition === 'pending_review' && 'En Revisión'}
-                          {performance.bonusCondition === 'not_eligible' && 'No Elegible'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedPerformance(performance)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{DEPARTMENTS[employee.department as keyof typeof DEPARTMENTS]?.name || employee.department}</Badge>
+                        </TableCell>
+                        <TableCell>{evaluation.period}</TableCell>
+                        <TableCell>
+                          <Badge className={CLASSIFICATION_COLORS[evaluation.classification]?.className || ''}>
+                            {CLASSIFICATION_COLORS[evaluation.classification]?.label || evaluation.classification}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={evaluation.overall_score} className="w-20 h-2" />
+                            <span className="text-sm font-medium">{evaluation.overall_score}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={
+                            evaluation.bonus_condition === 'eligible' ? 'bg-success/10 text-success' :
+                            evaluation.bonus_condition === 'pending_review' ? 'bg-warning/10 text-warning' :
+                            'bg-muted text-muted-foreground'
+                          }>
+                            {evaluation.bonus_condition === 'eligible' && 'Elegible'}
+                            {evaluation.bonus_condition === 'pending_review' && 'En Revisión'}
+                            {evaluation.bonus_condition === 'not_eligible' && 'No Elegible'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedEvaluation(evaluation)}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
         {/* Dialog Detail */}
-        <Dialog open={!!selectedPerformance} onOpenChange={() => setSelectedPerformance(null)}>
+        <Dialog open={!!selectedEvaluation} onOpenChange={() => setSelectedEvaluation(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Detalle de Evaluación</DialogTitle>
             </DialogHeader>
-            {selectedPerformance && (
+            {selectedEvaluation && (
               <div className="space-y-6">
                 {(() => {
-                  const employee = getEmployee(selectedPerformance.employeeId);
+                  const employee = getEmployee(selectedEvaluation.employee_id);
                   if (!employee) return null;
 
                   return (
@@ -239,21 +264,21 @@ export default function PerformancePage() {
                       <div className="flex items-start gap-4">
                         <Avatar className="h-16 w-16">
                           <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                            {employee.name.split(' ').map(n => n[0]).join('')}
+                            {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <h3 className="text-xl font-semibold">{employee.name}</h3>
                           <p className="text-muted-foreground">{employee.position}</p>
                           <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline">{DEPARTMENTS[employee.department].name}</Badge>
-                            <Badge className={CLASSIFICATION_COLORS[selectedPerformance.classification].className}>
-                              {CLASSIFICATION_COLORS[selectedPerformance.classification].label}
+                            <Badge variant="outline">{DEPARTMENTS[employee.department as keyof typeof DEPARTMENTS]?.name || employee.department}</Badge>
+                            <Badge className={CLASSIFICATION_COLORS[selectedEvaluation.classification]?.className || ''}>
+                              {CLASSIFICATION_COLORS[selectedEvaluation.classification]?.label || selectedEvaluation.classification}
                             </Badge>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-3xl font-bold text-primary">{selectedPerformance.overallScore}%</p>
+                          <p className="text-3xl font-bold text-primary">{selectedEvaluation.overall_score}%</p>
                           <p className="text-sm text-muted-foreground">Puntuación General</p>
                         </div>
                       </div>
@@ -261,26 +286,26 @@ export default function PerformancePage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Período</Label>
-                          <p className="font-medium">{selectedPerformance.period}</p>
+                          <p className="font-medium">{selectedEvaluation.period}</p>
                         </div>
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Evaluado por</Label>
-                          <p className="font-medium">{selectedPerformance.evaluatedBy}</p>
+                          <p className="font-medium">{selectedEvaluation.evaluated_by || 'N/A'}</p>
                         </div>
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Fecha de Evaluación</Label>
-                          <p className="font-medium">{format(parseISO(selectedPerformance.evaluatedAt), 'PPP', { locale: es })}</p>
+                          <p className="font-medium">{format(parseISO(selectedEvaluation.evaluated_at), 'PPP', { locale: es })}</p>
                         </div>
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Condición de Bono</Label>
                           <Badge className={
-                            selectedPerformance.bonusCondition === 'eligible' ? 'bg-success/10 text-success' :
-                            selectedPerformance.bonusCondition === 'pending_review' ? 'bg-warning/10 text-warning' :
+                            selectedEvaluation.bonus_condition === 'eligible' ? 'bg-success/10 text-success' :
+                            selectedEvaluation.bonus_condition === 'pending_review' ? 'bg-warning/10 text-warning' :
                             'bg-muted text-muted-foreground'
                           }>
-                            {selectedPerformance.bonusCondition === 'eligible' && 'Elegible'}
-                            {selectedPerformance.bonusCondition === 'pending_review' && 'En Revisión'}
-                            {selectedPerformance.bonusCondition === 'not_eligible' && 'No Elegible'}
+                            {selectedEvaluation.bonus_condition === 'eligible' && 'Elegible'}
+                            {selectedEvaluation.bonus_condition === 'pending_review' && 'En Revisión'}
+                            {selectedEvaluation.bonus_condition === 'not_eligible' && 'No Elegible'}
                           </Badge>
                         </div>
                       </div>
@@ -292,7 +317,7 @@ export default function PerformancePage() {
                           Indicadores de Desempeño (KPIs)
                         </Label>
                         <div className="space-y-3">
-                          {selectedPerformance.kpis.map((kpi, index) => {
+                          {(selectedEvaluation.kpis as KPI[]).map((kpi, index) => {
                             const achievement = (kpi.actual / kpi.target) * 100;
                             return (
                               <div key={index} className="p-4 rounded-xl bg-muted/50">
@@ -316,15 +341,15 @@ export default function PerformancePage() {
                         </div>
                       </div>
 
-                      {selectedPerformance.observations && (
+                      {selectedEvaluation.observations && (
                         <div className="space-y-1">
                           <Label className="text-muted-foreground">Observaciones</Label>
-                          <p className="p-3 rounded-lg bg-muted/50">{selectedPerformance.observations}</p>
+                          <p className="p-3 rounded-lg bg-muted/50">{selectedEvaluation.observations}</p>
                         </div>
                       )}
 
                       <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
-                        <p className="text-sm text-muted-foreground">{CLASSIFICATION_COLORS[selectedPerformance.classification].description}</p>
+                        <p className="text-sm text-muted-foreground">{CLASSIFICATION_COLORS[selectedEvaluation.classification]?.description}</p>
                       </div>
                     </>
                   );

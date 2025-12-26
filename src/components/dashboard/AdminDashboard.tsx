@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Users, UserX, Clock, Timer, TrendingUp, AlertTriangle, FileText, MessageSquare, FileCheck } from 'lucide-react';
+import { Users, UserX, Clock, Timer, TrendingUp, AlertTriangle, FileText, MessageSquare, FileCheck, Loader2 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { DepartmentOverview } from '@/components/dashboard/DepartmentOverview';
 import { RecentUploads } from '@/components/dashboard/RecentUploads';
@@ -7,34 +7,100 @@ import { AttendanceCharts } from '@/components/dashboard/AttendanceCharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { mockDepartmentStats, mockUploadedReports, mockContracts, mockEmployees } from '@/data/mockData';
 import { useNavigate } from 'react-router-dom';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useContracts } from '@/hooks/useContracts';
+import { useAttendance } from '@/hooks/useAttendance';
+import { useJustifications } from '@/hooks/useJustifications';
 import { getContractAlerts, groupAlertsByLevel } from '@/services/contractAlerts';
+import { DEPARTMENTS, Department, DepartmentStats } from '@/types/attendance';
 
 export function AdminDashboard() {
   const navigate = useNavigate();
+  const { employees, loading: loadingEmployees } = useEmployees();
+  const { contracts, loading: loadingContracts } = useContracts();
+  const { records: attendanceRecords, loading: loadingAttendance } = useAttendance();
+  const { justifications, loading: loadingJustifications } = useJustifications();
 
-  const totalEmployees = mockDepartmentStats.reduce((acc, stat) => acc + stat.totalEmployees, 0);
-  const presentToday = mockDepartmentStats.reduce((acc, stat) => acc + stat.presentToday, 0);
-  const totalAbsences = mockDepartmentStats.reduce((acc, stat) => acc + stat.absences, 0);
-  const totalTardies = mockDepartmentStats.reduce((acc, stat) => acc + stat.tardies, 0);
-  const totalOvertime = mockDepartmentStats.reduce((acc, stat) => acc + stat.overtimeHours, 0);
-  const avgAttendance = Math.round(mockDepartmentStats.reduce((acc, stat) => acc + stat.attendanceRate, 0) / mockDepartmentStats.length);
+  const loading = loadingEmployees || loadingContracts || loadingAttendance || loadingJustifications;
 
-  // Contract alerts calculation
-  const contractAlerts = getContractAlerts(mockContracts);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Calculate stats from real data
+  const today = new Date().toISOString().split('T')[0];
+  const todayRecords = attendanceRecords.filter(r => r.date === today);
+  
+  const totalEmployees = employees.filter(e => e.status === 'active').length;
+  const presentToday = todayRecords.filter(r => r.days_attended > 0).length;
+  const totalAbsences = todayRecords.reduce((acc, r) => acc + r.absences, 0);
+  const totalTardies = todayRecords.reduce((acc, r) => acc + r.tardy_count, 0);
+  const totalOvertime = todayRecords.reduce((acc, r) => acc + r.overtime_weekday + r.overtime_holiday, 0);
+  const avgAttendance = totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0;
+
+  // Contract alerts calculation - transform contracts to expected format
+  const typeMapping: Record<string, 'indefinido' | 'plazo_fijo' | 'tiempo_parcial' | 'practicas' | 'locacion'> = {
+    'indefinido': 'indefinido',
+    'plazo_fijo': 'plazo_fijo',
+    'por_obra': 'tiempo_parcial',
+    'honorarios': 'locacion',
+    'practica': 'practicas',
+  };
+  
+  const contractsForAlerts = contracts.map(c => ({
+    id: c.id,
+    employeeId: c.employee_id,
+    type: typeMapping[c.type] || 'indefinido',
+    startDate: c.start_date,
+    endDate: c.end_date || undefined,
+    position: c.position || '',
+    department: (c.department || 'ti') as Department,
+    salary: c.salary || 0,
+    status: (c.status === 'active' ? 'active' : c.status === 'expired' ? 'expired' : 'pending_renewal') as 'active' | 'expired' | 'pending_renewal',
+    documentsComplete: c.documents_complete || false,
+  }));
+  
+  const contractAlerts = getContractAlerts(contractsForAlerts);
   const alertsByLevel = groupAlertsByLevel(contractAlerts);
   const criticalCount = alertsByLevel.critical.length;
   const warningCount = alertsByLevel.warning.length;
   const infoCount = alertsByLevel.info.length;
   const totalExpiringContracts = criticalCount + warningCount + infoCount;
 
+  // Pending justifications
+  const pendingJustifications = justifications.filter(j => j.status === 'pending').length;
+
   const alerts = [
     ...(criticalCount > 0 ? [{ type: 'error', icon: FileCheck, message: `${criticalCount} contratos vencen en 7 días o menos`, action: '/contracts' }] : []),
     ...(warningCount > 0 ? [{ type: 'warning', icon: FileCheck, message: `${warningCount} contratos vencen en 15 días`, action: '/contracts' }] : []),
-    { type: 'warning', icon: Clock, message: `${totalTardies} tardanzas de hoy sin justificar`, action: '/attendance' },
-    { type: 'info', icon: MessageSquare, message: '5 justificaciones pendientes de revisar', action: '/justifications' },
+    ...(totalTardies > 0 ? [{ type: 'warning', icon: Clock, message: `${totalTardies} tardanzas de hoy sin justificar`, action: '/attendance' }] : []),
+    ...(pendingJustifications > 0 ? [{ type: 'info', icon: MessageSquare, message: `${pendingJustifications} justificaciones pendientes de revisar`, action: '/justifications' }] : []),
   ].filter(a => a.message);
+
+  // Department stats for overview
+  const departmentStats: DepartmentStats[] = (Object.keys(DEPARTMENTS) as Department[]).map(dept => {
+    const deptEmployees = employees.filter(e => e.department === dept);
+    const deptRecords = todayRecords.filter(r => 
+      deptEmployees.some(e => e.id === r.employee_id)
+    );
+    
+    return {
+      department: dept,
+      totalEmployees: deptEmployees.length,
+      presentToday: deptRecords.filter(r => r.days_attended > 0).length,
+      absences: deptRecords.reduce((acc, r) => acc + r.absences, 0),
+      tardies: deptRecords.reduce((acc, r) => acc + r.tardy_count, 0),
+      overtimeHours: deptRecords.reduce((acc, r) => acc + r.overtime_weekday + r.overtime_holiday, 0),
+      attendanceRate: deptEmployees.length > 0 
+        ? Math.round((deptRecords.filter(r => r.days_attended > 0).length / deptEmployees.length) * 100) 
+        : 0
+    };
+  }).filter(s => s.totalEmployees > 0);
 
   return (
     <div className="space-y-6">
@@ -87,7 +153,7 @@ export function AdminDashboard() {
               </div>
               <div className="mt-3 text-sm text-muted-foreground">
                 {contractAlerts.slice(0, 3).map(alert => {
-                  const employee = mockEmployees.find(e => e.id === alert.contract.employeeId);
+                  const employee = employees.find(e => e.id === alert.contract.employeeId);
                   return (
                     <div key={alert.contract.id} className="flex items-center gap-2">
                       <span>•</span>
@@ -156,7 +222,6 @@ export function AdminDashboard() {
           value={presentToday}
           icon={Users}
           variant="success"
-          trend={{ value: 2, isPositive: true }}
           delay={0.15}
         />
         <StatCard
@@ -175,7 +240,7 @@ export function AdminDashboard() {
         />
         <StatCard
           title="Horas Extra"
-          value={`${totalOvertime}h`}
+          value={`${Math.round(totalOvertime)}h`}
           icon={Timer}
           variant="primary"
           delay={0.3}
@@ -185,7 +250,6 @@ export function AdminDashboard() {
           value={`${avgAttendance}%`}
           icon={TrendingUp}
           variant="success"
-          trend={{ value: 1.5, isPositive: true }}
           delay={0.35}
         />
       </div>
@@ -196,8 +260,8 @@ export function AdminDashboard() {
           <AttendanceCharts />
         </div>
         <div className="space-y-6">
-          <DepartmentOverview stats={mockDepartmentStats} />
-          <RecentUploads reports={mockUploadedReports} />
+          <DepartmentOverview stats={departmentStats} />
+          <RecentUploads reports={[]} />
         </div>
       </div>
     </div>
