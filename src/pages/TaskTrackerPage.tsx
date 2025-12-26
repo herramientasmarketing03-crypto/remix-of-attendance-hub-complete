@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useEmployeeTasks, type EmployeeTask, type TaskUpdate } from '@/hooks/useEmployeeTasks';
+import { useEmployeeTasks, type EmployeeTask, type TaskUpdate, getEmployeeIdForTask } from '@/hooks/useEmployeeTasks';
+import { useEmployees } from '@/hooks/useEmployees';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   ListTodo, 
@@ -59,6 +60,7 @@ const PIE_COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#f97316', '#ef4444'];
 
 export default function TaskTrackerPage() {
   const { userRole, user, profile } = useAuth();
+  const { employees } = useEmployees();
   const { tasks, loading, stats, createTask, updateTask, toggleComplete, deleteTask } = useEmployeeTasks();
   const [activeTab, setActiveTab] = useState('seguimiento');
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
@@ -135,11 +137,22 @@ export default function TaskTrackerPage() {
     }
 
     try {
+      // Get employee_id for the assigned person
+      const employeeId = await getEmployeeIdForTask(newTask.assigned_to, user?.id);
+      
+      // Get the display name for assigned_to
+      let assignedToName = newTask.assigned_to;
+      if (newTask.assigned_to.toUpperCase() === 'YO') {
+        assignedToName = currentUserName || 'YO';
+      }
+
       await createTask({
         title: newTask.title,
         description: newTask.description || null,
-        assigned_to: newTask.assigned_to,
+        assigned_to: assignedToName,
         assigned_by: currentUserName,
+        employee_id: employeeId,
+        created_by_user_id: user?.id,
         priority: newTask.priority,
         status: newTask.status,
         category: newTask.category,
@@ -344,11 +357,20 @@ export default function TaskTrackerPage() {
                     </div>
                     <div>
                       <Label>Responsable</Label>
-                      <Input 
-                        value={newTask.assigned_to}
-                        onChange={(e) => setNewTask({...newTask, assigned_to: e.target.value})}
-                        placeholder="Nombre del responsable"
-                      />
+                      <Select 
+                        value={newTask.assigned_to} 
+                        onValueChange={(v) => setNewTask({...newTask, assigned_to: v})}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar responsable" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="YO">Yo mismo</SelectItem>
+                          {employees.map(emp => (
+                            <SelectItem key={emp.id} value={emp.name}>
+                              {emp.name} ({emp.department})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div>
