@@ -5,22 +5,55 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { motion } from 'framer-motion';
-import { Settings, Bell, Shield, Clock, Building2, Mail, Save } from 'lucide-react';
+import { Settings, Bell, Shield, Clock, Building2, Save, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSettings } from '@/contexts/SettingsContext';
 
 const SettingsPage = () => {
-  const handleSave = () => {
-    toast.success('Configuración guardada correctamente');
+  const { 
+    settings, 
+    updateCompanySettings, 
+    updateScheduleSettings, 
+    updateNotificationSettings,
+    updateSecuritySettings,
+    resetSettings 
+  } = useSettings();
+
+  const handleSaveCompany = () => {
+    toast.success('Configuración de empresa guardada');
+  };
+
+  const handleSaveSchedule = () => {
+    toast.success('Configuración de horarios guardada');
+  };
+
+  const handleSaveNotifications = () => {
+    toast.success('Preferencias de notificaciones guardadas');
+  };
+
+  const handleSaveSecurity = () => {
+    toast.success('Configuración de seguridad guardada');
+  };
+
+  const handleReset = () => {
+    resetSettings();
+    toast.success('Configuración restaurada a valores predeterminados');
   };
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold">Configuración</h1>
-          <p className="text-muted-foreground">Ajustes del sistema de asistencia</p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Configuración</h1>
+            <p className="text-muted-foreground">Ajustes del sistema de asistencia</p>
+          </div>
+          <Button variant="outline" onClick={handleReset}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Restaurar
+          </Button>
         </motion.div>
 
         <Tabs defaultValue="general" className="space-y-6">
@@ -44,28 +77,43 @@ const SettingsPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Nombre de la Empresa</Label>
-                      <Input defaultValue="Mi Empresa S.A.C." />
+                      <Input 
+                        value={settings.company.name}
+                        onChange={(e) => updateCompanySettings({ name: e.target.value })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>RUC</Label>
-                      <Input defaultValue="20123456789" />
+                      <Input 
+                        value={settings.company.ruc}
+                        onChange={(e) => updateCompanySettings({ ruc: e.target.value })}
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Dirección</Label>
-                    <Input defaultValue="Av. Principal 123, Lima" />
+                    <Input 
+                      value={settings.company.address}
+                      onChange={(e) => updateCompanySettings({ address: e.target.value })}
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Email de Contacto</Label>
-                      <Input defaultValue="rrhh@miempresa.com" />
+                      <Input 
+                        value={settings.company.email}
+                        onChange={(e) => updateCompanySettings({ email: e.target.value })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Teléfono</Label>
-                      <Input defaultValue="+51 1 234 5678" />
+                      <Input 
+                        value={settings.company.phone}
+                        onChange={(e) => updateCompanySettings({ phone: e.target.value })}
+                      />
                     </div>
                   </div>
-                  <Button className="gradient-primary" onClick={handleSave}>
+                  <Button className="gradient-primary" onClick={handleSaveCompany}>
                     <Save className="w-4 h-4 mr-2" />
                     Guardar Cambios
                   </Button>
@@ -88,26 +136,45 @@ const SettingsPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Hora de Entrada</Label>
-                      <Input type="time" defaultValue="09:00" />
+                      <Input 
+                        type="time" 
+                        value={settings.schedule.entryTime}
+                        onChange={(e) => updateScheduleSettings({ entryTime: e.target.value })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Hora de Salida</Label>
-                      <Input type="time" defaultValue="18:00" />
+                      <Input 
+                        type="time" 
+                        value={settings.schedule.exitTime}
+                        onChange={(e) => updateScheduleSettings({ exitTime: e.target.value })}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Tolerancia de Entrada (minutos)</Label>
-                      <Input type="number" defaultValue="10" />
+                      <Input 
+                        type="number" 
+                        value={settings.schedule.entryTolerance}
+                        onChange={(e) => updateScheduleSettings({ entryTolerance: parseInt(e.target.value) || 0 })}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Tolerancia de Salida (minutos)</Label>
-                      <Input type="number" defaultValue="5" />
+                      <Input 
+                        type="number" 
+                        value={settings.schedule.exitTolerance}
+                        onChange={(e) => updateScheduleSettings({ exitTolerance: parseInt(e.target.value) || 0 })}
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Tiempo de Refrigerio</Label>
-                    <Select defaultValue="60">
+                    <Select 
+                      value={String(settings.schedule.lunchDuration)}
+                      onValueChange={(v) => updateScheduleSettings({ lunchDuration: parseInt(v) })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -123,9 +190,12 @@ const SettingsPage = () => {
                       <p className="font-medium">Trabajo Remoto Habilitado</p>
                       <p className="text-sm text-muted-foreground">Permite marcación virtual con evidencia</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.schedule.remoteWorkEnabled}
+                      onCheckedChange={(checked) => updateScheduleSettings({ remoteWorkEnabled: checked })}
+                    />
                   </div>
-                  <Button className="gradient-primary" onClick={handleSave}>
+                  <Button className="gradient-primary" onClick={handleSaveSchedule}>
                     <Save className="w-4 h-4 mr-2" />
                     Guardar Cambios
                   </Button>
@@ -144,22 +214,57 @@ const SettingsPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {[
-                    { title: 'Contratos por vencer', desc: 'Notificar cuando un contrato está por vencer', default: true },
-                    { title: 'Tardanzas', desc: 'Alertar sobre tardanzas del personal', default: true },
-                    { title: 'Ausencias', desc: 'Notificar ausencias sin justificación', default: true },
-                    { title: 'Nuevos requerimientos', desc: 'Alertar sobre nuevas solicitudes de personal', default: true },
-                    { title: 'Mensajes', desc: 'Notificaciones de nuevos mensajes', default: false },
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
-                      <div>
-                        <p className="font-medium">{item.title}</p>
-                        <p className="text-sm text-muted-foreground">{item.desc}</p>
-                      </div>
-                      <Switch defaultChecked={item.default} />
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div>
+                      <p className="font-medium">Contratos por vencer</p>
+                      <p className="text-sm text-muted-foreground">Notificar cuando un contrato está por vencer</p>
                     </div>
-                  ))}
-                  <Button className="gradient-primary" onClick={handleSave}>
+                    <Switch 
+                      checked={settings.notifications.contractExpiry}
+                      onCheckedChange={(checked) => updateNotificationSettings({ contractExpiry: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div>
+                      <p className="font-medium">Tardanzas</p>
+                      <p className="text-sm text-muted-foreground">Alertar sobre tardanzas del personal</p>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.tardies}
+                      onCheckedChange={(checked) => updateNotificationSettings({ tardies: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div>
+                      <p className="font-medium">Ausencias</p>
+                      <p className="text-sm text-muted-foreground">Notificar ausencias sin justificación</p>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.absences}
+                      onCheckedChange={(checked) => updateNotificationSettings({ absences: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div>
+                      <p className="font-medium">Nuevos requerimientos</p>
+                      <p className="text-sm text-muted-foreground">Alertar sobre nuevas solicitudes de personal</p>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.requirements}
+                      onCheckedChange={(checked) => updateNotificationSettings({ requirements: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
+                    <div>
+                      <p className="font-medium">Mensajes</p>
+                      <p className="text-sm text-muted-foreground">Notificaciones de nuevos mensajes</p>
+                    </div>
+                    <Switch 
+                      checked={settings.notifications.messages}
+                      onCheckedChange={(checked) => updateNotificationSettings({ messages: checked })}
+                    />
+                  </div>
+                  <Button className="gradient-primary" onClick={handleSaveNotifications}>
                     <Save className="w-4 h-4 mr-2" />
                     Guardar Cambios
                   </Button>
@@ -183,21 +288,30 @@ const SettingsPage = () => {
                       <p className="font-medium">Autenticación de dos factores</p>
                       <p className="text-sm text-muted-foreground">Requiere código adicional al iniciar sesión</p>
                     </div>
-                    <Switch />
+                    <Switch 
+                      checked={settings.security.twoFactorEnabled}
+                      onCheckedChange={(checked) => updateSecuritySettings({ twoFactorEnabled: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                     <div>
                       <p className="font-medium">Bloqueo por intentos fallidos</p>
                       <p className="text-sm text-muted-foreground">Bloquea cuenta después de 5 intentos</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch 
+                      checked={settings.security.lockOnFailedAttempts}
+                      onCheckedChange={(checked) => updateSecuritySettings({ lockOnFailedAttempts: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30">
                     <div>
                       <p className="font-medium">Expiración de sesión</p>
                       <p className="text-sm text-muted-foreground">Cierra sesión después de inactividad</p>
                     </div>
-                    <Select defaultValue="60">
+                    <Select 
+                      value={String(settings.security.sessionTimeout)}
+                      onValueChange={(v) => updateSecuritySettings({ sessionTimeout: parseInt(v) })}
+                    >
                       <SelectTrigger className="w-32">
                         <SelectValue />
                       </SelectTrigger>
@@ -208,7 +322,7 @@ const SettingsPage = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button className="gradient-primary" onClick={handleSave}>
+                  <Button className="gradient-primary" onClick={handleSaveSecurity}>
                     <Save className="w-4 h-4 mr-2" />
                     Guardar Cambios
                   </Button>
