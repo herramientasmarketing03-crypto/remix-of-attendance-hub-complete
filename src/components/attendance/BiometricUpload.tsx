@@ -3,15 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileSpreadsheet, Clock, AlertTriangle, Check, Users, UserCheck, UserX, Calendar, Loader2, AlertCircle, Save, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Clock, AlertTriangle, Check, Users, UserCheck, UserX, Calendar, Loader2, AlertCircle, Save, X, UserPlus, FileText, DollarSign } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { parseBiometricFile, formatMinutesToTime, calculateEstimatedDeduction } from '@/services/biometricParser';
+import { parseBiometricFile, formatMinutesToTime } from '@/services/biometricParser';
 import { ParsedBiometricReport, DuplicateCheckResult, UploadConflictAction } from '@/types/payroll';
 import { useAttendanceUpload } from '@/hooks/useAttendanceUpload';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AddUnmatchedEmployeesDialog } from './AddUnmatchedEmployeesDialog';
+import { calculateDeductions, DeductionSummary, formatCurrency } from '@/services/deductionCalculator';
+import { downloadAttendancePdf } from '@/services/attendanceReportPdf';
 
 interface BiometricUploadProps {
   onProcessComplete?: (result: ParsedBiometricReport) => void;
@@ -27,6 +30,8 @@ export function BiometricUpload({ onProcessComplete }: BiometricUploadProps) {
   const [duplicateCheck, setDuplicateCheck] = useState<DuplicateCheckResult | null>(null);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [saveResult, setSaveResult] = useState<{ saved: number; skipped: number } | null>(null);
+  const [showAddEmployeesDialog, setShowAddEmployeesDialog] = useState(false);
+  const [deductions, setDeductions] = useState<DeductionSummary | null>(null);
 
   const { checkForDuplicates, saveAttendanceRecords, isChecking, isSaving } = useAttendanceUpload();
 
@@ -53,6 +58,10 @@ export function BiometricUpload({ onProcessComplete }: BiometricUploadProps) {
       const parsedReport = await parseBiometricFile(selectedFile);
       setReport(parsedReport);
       setStep('preview');
+      
+      // Calculate deductions
+      const calculatedDeductions = calculateDeductions(parsedReport);
+      setDeductions(calculatedDeductions);
       
       // Check for duplicates
       const duplicates = await checkForDuplicates(parsedReport);
@@ -99,6 +108,24 @@ export function BiometricUpload({ onProcessComplete }: BiometricUploadProps) {
     setStep('upload');
     setDuplicateCheck(null);
     setSaveResult(null);
+    setDeductions(null);
+  };
+
+  const handleDownloadPdf = () => {
+    if (!report || !deductions) return;
+    downloadAttendancePdf(report, deductions, {
+      companyName: 'Empresa',
+      reportTitle: 'Reporte de Asistencia',
+      showDeductions: true
+    });
+    toast.success('PDF generado correctamente');
+  };
+
+  const handleEmployeesAdded = async () => {
+    // Re-process the file to update matches
+    if (selectedFile) {
+      await handleProcess();
+    }
   };
 
   return (
