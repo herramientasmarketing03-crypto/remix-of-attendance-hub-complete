@@ -11,9 +11,8 @@ import { Building2, Users, Eye, GitBranch, Briefcase, AlertCircle } from 'lucide
 import { useEmployees } from '@/hooks/useEmployees';
 import { useDepartmentPositions } from '@/hooks/useDepartmentPositions';
 import { DEPARTMENTS } from '@/types/attendance';
-import { COMPANY_ORG_CHART } from '@/data/organizationData';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CompanyOrgChart } from '@/components/departments/OrgChart';
+import { RealOrgChart } from '@/components/departments/RealOrgChart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -201,13 +200,13 @@ const DepartmentsPage = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <GitBranch className="w-5 h-5 text-primary" />
-                  Organigrama General - {COMPANY_ORG_CHART.name}
+                  Organigrama con Empleados Vinculados
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CompanyOrgChart 
-                  rootNode={COMPANY_ORG_CHART.ceo} 
-                  title="Estructura Organizacional"
+                <RealOrgChart 
+                  employees={employees}
+                  positions={positions}
                 />
               </CardContent>
             </Card>

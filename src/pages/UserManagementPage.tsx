@@ -170,6 +170,9 @@ export default function UserManagementPage() {
     try {
       // Update user_roles with employee_id
       const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+      const previousEmployee = selectedUser.employee_id 
+        ? employees.find(e => e.id === selectedUser.employee_id) 
+        : null;
       
       const { error: roleError } = await supabase
         .from('user_roles')
@@ -181,14 +184,37 @@ export default function UserManagementPage() {
 
       if (roleError) throw roleError;
 
+      // Helper function to update position count
+      const updatePositionCount = async (department: string, position: string, increment: number) => {
+        const { data: positionData } = await supabase
+          .from('department_positions')
+          .select('id, current_count')
+          .eq('department', department)
+          .eq('position_name', position)
+          .single();
+
+        if (positionData) {
+          const newCount = Math.max(0, (positionData.current_count || 0) + increment);
+          await supabase
+            .from('department_positions')
+            .update({ current_count: newCount })
+            .eq('id', positionData.id);
+        }
+      };
+
       // Update employee with user_id
       if (selectedEmployeeId) {
-        // First, unlink any previous employee
+        // First, unlink any previous employee and update their position count
         if (selectedUser.employee_id && selectedUser.employee_id !== selectedEmployeeId) {
           await supabase
             .from('employees')
             .update({ user_id: null })
             .eq('id', selectedUser.employee_id);
+          
+          // Decrement position count for previous employee's position
+          if (previousEmployee?.position && previousEmployee?.department) {
+            await updatePositionCount(previousEmployee.department, previousEmployee.position, -1);
+          }
         }
 
         const { error: empError } = await supabase
@@ -197,15 +223,25 @@ export default function UserManagementPage() {
           .eq('id', selectedEmployeeId);
 
         if (empError) throw empError;
+
+        // Increment position count for new employee's position
+        if (selectedEmployee?.position && selectedEmployee?.department) {
+          await updatePositionCount(selectedEmployee.department, selectedEmployee.position, 1);
+        }
       } else if (selectedUser.employee_id) {
         // Unlink employee
         await supabase
           .from('employees')
           .update({ user_id: null })
           .eq('id', selectedUser.employee_id);
+
+        // Decrement position count
+        if (previousEmployee?.position && previousEmployee?.department) {
+          await updatePositionCount(previousEmployee.department, previousEmployee.position, -1);
+        }
       }
 
-      toast.success('Empleado vinculado correctamente');
+      toast.success(selectedEmployeeId ? 'Empleado vinculado correctamente' : 'Empleado desvinculado');
       setLinkDialogOpen(false);
       fetchData();
     } catch (error) {
