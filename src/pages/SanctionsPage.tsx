@@ -7,28 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
-import { 
-  AlertTriangle, 
-  Search, 
-  Scale, 
-  Check, 
-  X, 
-  Eye,
-  Clock,
-  FileText,
-  Users
-} from 'lucide-react';
-import { mockSanctions, mockEmployees } from '@/data/mockData';
+import { AlertTriangle, Search, Scale, Check, X, Eye, Clock, Users, Loader2 } from 'lucide-react';
+import { useSanctions } from '@/hooks/useSanctions';
+import { useEmployees } from '@/hooks/useEmployees';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sanction, SanctionType, InfractionLevel } from '@/types/attendance';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { logAction } from '@/services/auditLog';
 
 type SanctionApprovalStatus = 'pending' | 'approved' | 'rejected';

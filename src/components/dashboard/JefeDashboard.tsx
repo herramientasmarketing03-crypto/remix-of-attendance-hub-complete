@@ -1,37 +1,56 @@
 import { motion } from 'framer-motion';
-import { Users, Clock, Timer, TrendingUp, MessageSquare, AlertTriangle, Gavel } from 'lucide-react';
+import { Users, Clock, TrendingUp, MessageSquare, AlertTriangle, Gavel, Loader2 } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { mockDepartmentStats, mockEmployees, mockAttendanceRecords } from '@/data/mockData';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useAttendance } from '@/hooks/useAttendance';
 import { DEPARTMENTS, Department } from '@/types/attendance';
 
 export function JefeDashboard() {
   const navigate = useNavigate();
   const { userRole } = useAuth();
+  const { employees, loading: loadingEmployees } = useEmployees();
+  const { records: attendanceRecords, loading: loadingAttendance } = useAttendance();
+  
+  const loading = loadingEmployees || loadingAttendance;
   
   // Dynamic area based on user's area_id
   const areaId = (userRole?.area_id || 'ti') as Department;
   const areaName = DEPARTMENTS[areaId]?.name || 'Mi Departamento';
   
-  const deptStats = mockDepartmentStats.find(s => s.department === areaId);
-  const deptEmployees = mockEmployees.filter(e => e.department === areaId);
-
-  // Get today's tardies for the department
+  // Filter employees by department
+  const deptEmployees = employees.filter(e => e.department === areaId && e.status === 'active');
+  
+  // Get today's records for the department
   const today = new Date().toISOString().split('T')[0];
-  const todayRecords = mockAttendanceRecords.filter(
-    r => deptEmployees.some(e => e.id === r.employeeId) && r.date === today
+  const todayRecords = attendanceRecords.filter(
+    r => deptEmployees.some(e => e.id === r.employee_id) && r.date === today
   );
-  const tardiesCount = todayRecords.filter(r => r.tardyCount > 0).length;
+  
+  const presentCount = todayRecords.filter(r => r.days_attended > 0).length;
+  const tardiesCount = todayRecords.filter(r => r.tardy_count > 0).length;
+  const totalTardies = todayRecords.reduce((acc, r) => acc + r.tardy_count, 0);
+  const attendanceRate = deptEmployees.length > 0 
+    ? Math.round((presentCount / deptEmployees.length) * 100) 
+    : 0;
 
-  if (!deptStats) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (deptEmployees.length === 0) {
     return (
       <div className="p-6 text-center">
-        <p className="text-muted-foreground">No hay datos disponibles para tu departamento.</p>
+        <p className="text-muted-foreground">No hay empleados en tu departamento.</p>
       </div>
     );
   }
@@ -75,28 +94,28 @@ export function JefeDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Empleados"
-          value={deptStats.totalEmployees}
+          value={deptEmployees.length}
           icon={Users}
           variant="primary"
           delay={0.1}
         />
         <StatCard
           title="Presentes Hoy"
-          value={deptStats.presentToday}
+          value={presentCount}
           icon={Users}
           variant="success"
           delay={0.15}
         />
         <StatCard
           title="Tardanzas"
-          value={deptStats.tardies}
+          value={totalTardies}
           icon={Clock}
           variant="warning"
           delay={0.2}
         />
         <StatCard
           title="% Asistencia"
-          value={`${deptStats.attendanceRate}%`}
+          value={`${attendanceRate}%`}
           icon={TrendingUp}
           variant="success"
           delay={0.25}
@@ -114,9 +133,9 @@ export function JefeDashboard() {
           <CardContent>
             <div className="space-y-3">
               {deptEmployees.slice(0, 5).map((employee, index) => {
-                const empRecord = todayRecords.find(r => r.employeeId === employee.id);
-                const isPresent = empRecord && empRecord.daysAttended > 0;
-                const hasTardy = empRecord && empRecord.tardyCount > 0;
+                const empRecord = todayRecords.find(r => r.employee_id === employee.id);
+                const isPresent = empRecord && empRecord.days_attended > 0;
+                const hasTardy = empRecord && empRecord.tardy_count > 0;
                 
                 return (
                   <motion.div
@@ -129,7 +148,7 @@ export function JefeDashboard() {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-primary/10 text-primary">
-                          {employee.name.split(' ').map(n => n[0]).join('')}
+                          {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
@@ -165,7 +184,7 @@ export function JefeDashboard() {
             </Button>
             <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/justifications')}>
               <MessageSquare className="w-4 h-4 mr-2" />
-              Enviar justificación
+              Revisar justificaciones
             </Button>
             <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/sanctions')}>
               <Gavel className="w-4 h-4 mr-2" />

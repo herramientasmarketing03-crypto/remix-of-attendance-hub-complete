@@ -4,58 +4,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { Wallet, Download, FileText, DollarSign, Clock, Users, Calculator } from 'lucide-react';
+import { Wallet, Download, FileText, DollarSign, Clock, Users, Calculator, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockEmployees, mockAttendanceRecords } from '@/data/mockData';
-import { Payslip } from '@/types/payroll';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useAttendance } from '@/hooks/useAttendance';
+import { useContracts } from '@/hooks/useContracts';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-// Calculate payslip based on attendance data
-function calculatePayslip(employeeId: string, period: string, baseSalary: number): Payslip {
-  const records = mockAttendanceRecords.filter(r => r.employeeId === employeeId);
-  
-  const totalTardyMinutes = records.reduce((acc, r) => acc + r.tardyMinutes, 0);
-  const totalAbsences = records.reduce((acc, r) => acc + r.absences, 0);
-  const totalOvertime = records.reduce((acc, r) => acc + r.overtimeWeekday + r.overtimeHoliday, 0);
-  
-  // Calculate deductions
-  const hourlyRate = baseSalary / 240; // 240 hours per month
-  const minuteRate = hourlyRate / 60;
-  
-  const tardyDeduction = totalTardyMinutes * minuteRate;
-  const absenceDeduction = totalAbsences * (baseSalary / 30);
-  const afpDeduction = baseSalary * 0.13;
-  const overtimePay = totalOvertime * hourlyRate * 1.25;
-  
-  // Income tax calculation (simplified)
-  const incomeTaxDeduction = baseSalary > 4000 ? (baseSalary - 4000) * 0.08 : 0;
-  
-  const totalDeductions = tardyDeduction + absenceDeduction + afpDeduction + incomeTaxDeduction;
-  const totalBonuses = overtimePay;
-  const netSalary = baseSalary - totalDeductions + totalBonuses;
-
-  return {
-    id: `${employeeId}-${period}`,
-    employeeId,
-    period,
-    date: new Date().toISOString().split('T')[0],
-    grossSalary: baseSalary,
-    tardyMinutes: totalTardyMinutes,
-    tardyDeduction,
-    absenceDays: totalAbsences,
-    absenceDeduction,
-    overtimeHours: totalOvertime,
-    overtimePay,
-    afpDeduction,
-    incomeTaxDeduction,
-    otherDeductions: [],
-    totalDeductions,
-    totalBonuses,
-    netSalary,
-    status: 'generated'
-  };
+interface Payslip {
+  id: string;
+  employeeId: string;
+  period: string;
+  grossSalary: number;
+  tardyMinutes: number;
+  tardyDeduction: number;
+  absenceDays: number;
+  absenceDeduction: number;
+  overtimeHours: number;
+  overtimePay: number;
+  afpDeduction: number;
+  incomeTaxDeduction: number;
+  totalDeductions: number;
+  totalBonuses: number;
+  netSalary: number;
 }
 
 const PayrollPage = () => {
@@ -64,21 +37,72 @@ const PayrollPage = () => {
   const [selectedMonth, setSelectedMonth] = useState('12');
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
 
+  const { employees, loading: loadingEmployees } = useEmployees();
+  const { records: attendanceRecords, loading: loadingAttendance } = useAttendance();
+  const { contracts, loading: loadingContracts } = useContracts();
+
+  const loading = loadingEmployees || loadingAttendance || loadingContracts;
+
   // Get current employee for empleado view
-  const currentEmployeeId = userRole?.employeeId || '4';
-  const currentEmployee = mockEmployees.find(e => e.id === currentEmployeeId);
+  const currentEmployeeId = userRole?.employeeId;
+  const currentEmployee = employees.find(e => e.id === currentEmployeeId);
+
+  // Calculate payslip based on attendance data
+  const calculatePayslip = (employeeId: string, period: string, baseSalary: number): Payslip => {
+    const records = attendanceRecords.filter(r => r.employee_id === employeeId);
+    
+    const totalTardyMinutes = records.reduce((acc, r) => acc + (r.tardy_minutes || 0), 0);
+    const totalAbsences = records.reduce((acc, r) => acc + (r.absences || 0), 0);
+    const totalOvertime = records.reduce((acc, r) => acc + Number(r.overtime_weekday || 0) + Number(r.overtime_holiday || 0), 0);
+    
+    // Calculate deductions
+    const hourlyRate = baseSalary / 240; // 240 hours per month
+    const minuteRate = hourlyRate / 60;
+    
+    const tardyDeduction = totalTardyMinutes * minuteRate;
+    const absenceDeduction = totalAbsences * (baseSalary / 30);
+    const afpDeduction = baseSalary * 0.13;
+    const overtimePay = totalOvertime * hourlyRate * 1.25;
+    
+    // Income tax calculation (simplified)
+    const incomeTaxDeduction = baseSalary > 4000 ? (baseSalary - 4000) * 0.08 : 0;
+    
+    const totalDeductions = tardyDeduction + absenceDeduction + afpDeduction + incomeTaxDeduction;
+    const totalBonuses = overtimePay;
+    const netSalary = baseSalary - totalDeductions + totalBonuses;
+
+    return {
+      id: `${employeeId}-${period}`,
+      employeeId,
+      period,
+      grossSalary: baseSalary,
+      tardyMinutes: totalTardyMinutes,
+      tardyDeduction,
+      absenceDays: totalAbsences,
+      absenceDeduction,
+      overtimeHours: totalOvertime,
+      overtimePay,
+      afpDeduction,
+      incomeTaxDeduction,
+      totalDeductions,
+      totalBonuses,
+      netSalary,
+    };
+  };
 
   // Generate payslips for all employees (admin) or current employee
   const payslips = useMemo(() => {
     const period = `${selectedMonth}/${selectedYear}`;
-    const employees = isAdmin ? mockEmployees : [currentEmployee].filter(Boolean);
+    const targetEmployees = isAdmin ? employees : [currentEmployee].filter(Boolean);
     
-    return employees.map(emp => {
+    return targetEmployees.map(emp => {
       if (!emp) return null;
-      const baseSalary = 4500; // Default salary, should come from contracts
+      // Get salary from contract or default
+      const contract = contracts.find(c => c.employee_id === emp.id);
+      const baseSalary = contract?.salary || 4500;
       return { payslip: calculatePayslip(emp.id, period, baseSalary), employee: emp };
-    }).filter(Boolean) as { payslip: Payslip; employee: typeof mockEmployees[0] }[];
-  }, [isAdmin, currentEmployee, selectedMonth, selectedYear]);
+    }).filter(Boolean) as { payslip: Payslip; employee: typeof employees[0] }[];
+  }, [isAdmin, currentEmployee, employees, contracts, attendanceRecords, selectedMonth, selectedYear]);
 
   const selectedPayslipData = selectedEmployee 
     ? payslips.find(p => p.employee.id === selectedEmployee) 
@@ -88,6 +112,16 @@ const PayrollPage = () => {
   const totalGross = payslips.reduce((acc, p) => acc + p.payslip.grossSalary, 0);
   const totalDeductions = payslips.reduce((acc, p) => acc + p.payslip.totalDeductions, 0);
   const totalNet = payslips.reduce((acc, p) => acc + p.payslip.netSalary, 0);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -206,38 +240,42 @@ const PayrollPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
-                {payslips.map((data, index) => (
-                  <motion.div
-                    key={data.employee.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`p-4 rounded-xl cursor-pointer transition-all ${
-                      selectedEmployee === data.employee.id || (!selectedEmployee && index === 0)
-                        ? 'bg-primary/10 border-2 border-primary' 
-                        : 'bg-muted/30 hover:bg-muted/50'
-                    }`}
-                    onClick={() => setSelectedEmployee(data.employee.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                          {data.employee.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{data.employee.name}</p>
-                        <p className="text-sm text-muted-foreground">S/. {data.payslip.netSalary.toLocaleString()}</p>
+                {payslips.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No hay empleados</p>
+                ) : (
+                  payslips.map((data, index) => (
+                    <motion.div
+                      key={data.employee.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`p-4 rounded-xl cursor-pointer transition-all ${
+                        selectedEmployee === data.employee.id || (!selectedEmployee && index === 0)
+                          ? 'bg-primary/10 border-2 border-primary' 
+                          : 'bg-muted/30 hover:bg-muted/50'
+                      }`}
+                      onClick={() => setSelectedEmployee(data.employee.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                            {data.employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{data.employee.name}</p>
+                          <p className="text-sm text-muted-foreground">S/. {data.payslip.netSalary.toLocaleString()}</p>
+                        </div>
+                        {data.payslip.tardyMinutes > 0 && (
+                          <Badge variant="warning" className="text-xs">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {data.payslip.tardyMinutes}m
+                          </Badge>
+                        )}
                       </div>
-                      {data.payslip.tardyMinutes > 0 && (
-                        <Badge variant="warning" className="text-xs">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {data.payslip.tardyMinutes}m
-                        </Badge>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>

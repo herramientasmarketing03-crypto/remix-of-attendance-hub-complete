@@ -3,41 +3,64 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import { Clock, Calendar, Filter, Download, LayoutGrid, List } from 'lucide-react';
-import { mockAttendanceRecords, mockEmployees } from '@/data/mockData';
+import { Clock, Filter, Download, LayoutGrid, List, Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttendanceCalendar } from '@/components/attendance/AttendanceCalendar';
+import { useAttendance } from '@/hooks/useAttendance';
+import { useEmployees } from '@/hooks/useEmployees';
+import { DEPARTMENTS } from '@/types/attendance';
 
 const AttendancePage = () => {
   const [selectedDept, setSelectedDept] = useState('all');
-  
-  const records = mockAttendanceRecords.slice(0, 50).map(record => {
-    const employee = mockEmployees.find(e => e.id === record.employeeId);
-    return { ...record, employee };
-  });
+  const { records, loading: loadingRecords } = useAttendance();
+  const { employees, loading: loadingEmployees } = useEmployees();
+
+  const loading = loadingRecords || loadingEmployees;
+
+  const filteredRecords = records
+    .filter(record => {
+      if (selectedDept === 'all') return true;
+      const employee = employees.find(e => e.id === record.employee_id);
+      return employee?.department === selectedDept;
+    })
+    .slice(0, 50)
+    .map(record => {
+      const employee = employees.find(e => e.id === record.employee_id);
+      return { ...record, employee };
+    });
 
   const getStatusBadge = (status: string) => {
-    const styles = {
+    const styles: Record<string, string> = {
       validated: 'bg-success/10 text-success',
       pending: 'bg-warning/10 text-warning',
       rejected: 'bg-destructive/10 text-destructive',
       justified: 'bg-primary/10 text-primary',
     };
-    const labels = {
+    const labels: Record<string, string> = {
       validated: 'Validado',
       pending: 'Pendiente',
       rejected: 'Rechazado',
       justified: 'Justificado',
     };
     return (
-      <Badge className={styles[status as keyof typeof styles]}>
-        {labels[status as keyof typeof labels]}
+      <Badge className={styles[status] || 'bg-muted text-muted-foreground'}>
+        {labels[status] || status}
       </Badge>
     );
   };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -93,66 +116,71 @@ const AttendancePage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="comercial">Comercial</SelectItem>
-                      <SelectItem value="ti">TI</SelectItem>
-                      <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="soporte">Soporte</SelectItem>
+                      {Object.entries(DEPARTMENTS).map(([key, dept]) => (
+                        <SelectItem key={key} value={key}>{dept.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead>Empleado</TableHead>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Horas</TableHead>
-                        <TableHead>Tardanza</TableHead>
-                        <TableHead>H. Extra</TableHead>
-                        <TableHead>Estado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {records.map((record, index) => (
-                        <motion.tr
-                          key={record.id}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.02 }}
-                          className="hover:bg-muted/30"
-                        >
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{record.employee?.name}</p>
-                              <p className="text-xs text-muted-foreground">{record.employee?.position}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{record.date}</TableCell>
-                          <TableCell>
-                            <span className={record.workedHours < 8 ? 'text-destructive' : ''}>
-                              {Math.round(record.workedHours * 10) / 10}h
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {record.tardyMinutes > 0 ? (
-                              <span className="text-warning">{record.tardyMinutes} min</span>
-                            ) : (
-                              <span className="text-success">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {record.overtimeWeekday > 0 ? (
-                              <span className="text-primary">{Math.round(record.overtimeWeekday * 10) / 10}h</span>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(record.status)}</TableCell>
-                        </motion.tr>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                {filteredRecords.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay registros de asistencia
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Empleado</TableHead>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Horas</TableHead>
+                          <TableHead>Tardanza</TableHead>
+                          <TableHead>H. Extra</TableHead>
+                          <TableHead>Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredRecords.map((record, index) => (
+                          <motion.tr
+                            key={record.id}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.02 }}
+                            className="hover:bg-muted/30"
+                          >
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{record.employee?.name || 'Desconocido'}</p>
+                                <p className="text-xs text-muted-foreground">{record.employee?.position}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>{record.date}</TableCell>
+                            <TableCell>
+                              <span className={Number(record.worked_hours) < 8 ? 'text-destructive' : ''}>
+                                {Math.round(Number(record.worked_hours) * 10) / 10}h
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {record.tardy_minutes > 0 ? (
+                                <span className="text-warning">{record.tardy_minutes} min</span>
+                              ) : (
+                                <span className="text-success">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {Number(record.overtime_weekday) > 0 ? (
+                                <span className="text-primary">{Math.round(Number(record.overtime_weekday) * 10) / 10}h</span>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(record.status)}</TableCell>
+                          </motion.tr>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
