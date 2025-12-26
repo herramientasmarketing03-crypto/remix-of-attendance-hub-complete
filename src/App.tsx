@@ -33,6 +33,7 @@ import TerminationPage from "./pages/TerminationPage";
 import SanctionsPage from "./pages/SanctionsPage";
 import LeaveRequestsPage from "./pages/LeaveRequestsPage";
 import AuditLogPage from "./pages/AuditLogPage";
+import UserManagementPage from "./pages/UserManagementPage";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
                   <Route path="/sanctions" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><SanctionsPage /></ProtectedRoute>} />
                   <Route path="/leave-requests" element={<ProtectedRoute><LeaveRequestsPage /></ProtectedRoute>} />
                   <Route path="/audit-log" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><AuditLogPage /></ProtectedRoute>} />
+                  <Route path="/user-management" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><UserManagementPage /></ProtectedRoute>} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </SettingsProvider>
