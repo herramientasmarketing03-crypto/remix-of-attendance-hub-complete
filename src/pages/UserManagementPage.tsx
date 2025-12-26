@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, UserCog, Shield, Users, Link2, RefreshCw, Edit, Unlink } from 'lucide-react';
+import { Search, UserCog, Shield, Users, Link2, RefreshCw, Edit, KeyRound } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { AppRole } from '@/contexts/AuthContext';
 
 interface UserWithRole {
@@ -68,6 +69,7 @@ export default function UserManagementPage() {
     area_id: '',
   });
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -247,6 +249,34 @@ export default function UserManagementPage() {
     } catch (error) {
       console.error('Error linking employee:', error);
       toast.error('Error al vincular empleado');
+    }
+  };
+
+  const handleResetPassword = async (userId: string) => {
+    setResettingPassword(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('No hay sesión activa');
+        return;
+      }
+
+      const response = await supabase.functions.invoke('reset-user-password', {
+        body: { userId },
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      toast.success('Contraseña reseteada a: 123456', {
+        description: 'El usuario deberá cambiarla en su próximo inicio de sesión',
+      });
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      toast.error('Error al resetear la contraseña');
+    } finally {
+      setResettingPassword(null);
     }
   };
 
@@ -464,11 +494,12 @@ export default function UserManagementPage() {
                             {new Date(user.created_at).toLocaleDateString('es-PE')}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleEditRole(user)}
+                                title="Editar rol"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -476,9 +507,38 @@ export default function UserManagementPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleLinkEmployee(user)}
+                                title="Vincular empleado"
                               >
                                 <Link2 className="w-4 h-4" />
                               </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Resetear contraseña"
+                                    disabled={resettingPassword === user.user_id}
+                                  >
+                                    <KeyRound className={`w-4 h-4 ${resettingPassword === user.user_id ? 'animate-spin' : ''}`} />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Resetear contraseña?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Se reseteará la contraseña de <strong>{user.nombres} {user.apellidos}</strong> ({user.email}) a: <strong>123456</strong>
+                                      <br /><br />
+                                      El usuario deberá cambiar su contraseña en el próximo inicio de sesión.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleResetPassword(user.user_id)}>
+                                      Resetear Contraseña
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </TableCell>
                         </TableRow>
