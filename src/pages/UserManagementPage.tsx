@@ -565,14 +565,14 @@ export default function UserManagementPage() {
               <div className="space-y-2">
                 <Label>Empleado</Label>
                 <Select
-                  value={selectedEmployeeId}
-                  onValueChange={setSelectedEmployeeId}
+                  value={selectedEmployeeId || '__none__'}
+                  onValueChange={(value) => setSelectedEmployeeId(value === '__none__' ? '' : value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar empleado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin vincular</SelectItem>
+                    <SelectItem value="__none__">Sin vincular</SelectItem>
                     {unlinkedEmployees.map(emp => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.name} - {emp.position} ({emp.department})
