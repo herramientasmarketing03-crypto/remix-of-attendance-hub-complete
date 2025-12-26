@@ -4,17 +4,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Calendar, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
-import { mockAttendanceRecords, mockEmployees } from '@/data/mockData';
+import { ChevronLeft, ChevronRight, Calendar, CheckCircle, XCircle, Clock, Coffee } from 'lucide-react';
 import { DEPARTMENTS } from '@/types/attendance';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, getDay, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, getDay, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { AttendanceRecord } from '@/hooks/useAttendance';
+
+interface Employee {
+  id: string;
+  name: string;
+  department: string;
+  position?: string | null;
+}
 
 interface AttendanceCalendarProps {
   employeeId?: string;
+  records?: AttendanceRecord[];
+  employees?: Employee[];
 }
 
-export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
+export function AttendanceCalendar({ employeeId, records = [], employees = [] }: AttendanceCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDept, setSelectedDept] = useState('all');
 
@@ -25,32 +34,36 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
   }, [currentMonth]);
 
   const recordsByDate = useMemo(() => {
-    const map: Record<string, { present: number; absent: number; tardy: number; total: number }> = {};
+    const map: Record<string, { present: number; absent: number; tardy: number; total: number; breakMinutes: number }> = {};
     
-    const filteredRecords = mockAttendanceRecords.filter(record => {
-      if (employeeId && record.employeeId !== employeeId) return false;
-      const employee = mockEmployees.find(e => e.id === record.employeeId);
+    const filteredRecords = records.filter(record => {
+      if (employeeId && record.employee_id !== employeeId) return false;
+      const employee = employees.find(e => e.id === record.employee_id);
       if (selectedDept !== 'all' && employee?.department !== selectedDept) return false;
       return true;
     });
 
     filteredRecords.forEach(record => {
       if (!map[record.date]) {
-        map[record.date] = { present: 0, absent: 0, tardy: 0, total: 0 };
+        map[record.date] = { present: 0, absent: 0, tardy: 0, total: 0, breakMinutes: 0 };
       }
       map[record.date].total++;
-      if (record.daysAttended > 0) {
+      if (record.days_attended > 0) {
         map[record.date].present++;
-        if (record.tardyMinutes > 0) {
+        if (record.tardy_minutes > 0) {
           map[record.date].tardy++;
         }
-      } else {
+      } else if (record.absences > 0) {
         map[record.date].absent++;
+      }
+      // Track break minutes
+      if (record.break_minutes) {
+        map[record.date].breakMinutes += record.break_minutes;
       }
     });
 
     return map;
-  }, [employeeId, selectedDept]);
+  }, [employeeId, selectedDept, records, employees]);
 
   const getDayStatus = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -82,6 +95,18 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
 
   const startPadding = getDay(startOfMonth(currentMonth));
   const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  // Calculate monthly stats
+  const monthlyStats = useMemo(() => {
+    const workDays = days.filter(d => getDay(d) !== 0 && getDay(d) !== 6).length;
+    const totalPresent = Object.values(recordsByDate).reduce((sum, r) => sum + r.present, 0);
+    const totalRecords = Object.values(recordsByDate).reduce((sum, r) => sum + r.total, 0);
+    const avgAttendance = totalRecords > 0 ? Math.round((totalPresent / totalRecords) * 100) : 0;
+    const totalTardies = Object.values(recordsByDate).reduce((sum, r) => sum + r.tardy, 0);
+    const totalAbsences = Object.values(recordsByDate).reduce((sum, r) => sum + r.absent, 0);
+
+    return { workDays, avgAttendance, totalTardies, totalAbsences };
+  }, [days, recordsByDate]);
 
   return (
     <Card className="glass-card">
@@ -197,6 +222,9 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
                       {record.tardy > 0 && (
                         <Clock className="w-3 h-3 text-warning" />
                       )}
+                      {record.breakMinutes > 0 && (
+                        <Coffee className="w-3 h-3 text-info" />
+                      )}
                     </div>
                   )}
                 </div>
@@ -208,10 +236,10 @@ export function AttendanceCalendar({ employeeId }: AttendanceCalendarProps) {
         {/* Monthly Summary */}
         <div className="grid grid-cols-4 gap-3 mt-4 pt-4 border-t">
           {[
-            { label: 'Días Laborables', value: days.filter(d => getDay(d) !== 0 && getDay(d) !== 6).length, icon: Calendar, color: 'text-primary' },
-            { label: 'Asistencia Promedio', value: '94%', icon: CheckCircle, color: 'text-success' },
-            { label: 'Tardanzas', value: Object.values(recordsByDate).reduce((sum, r) => sum + r.tardy, 0), icon: Clock, color: 'text-warning' },
-            { label: 'Ausencias', value: Object.values(recordsByDate).reduce((sum, r) => sum + r.absent, 0), icon: XCircle, color: 'text-destructive' },
+            { label: 'Días Laborables', value: monthlyStats.workDays, icon: Calendar, color: 'text-primary' },
+            { label: 'Asistencia Promedio', value: `${monthlyStats.avgAttendance}%`, icon: CheckCircle, color: 'text-success' },
+            { label: 'Tardanzas', value: monthlyStats.totalTardies, icon: Clock, color: 'text-warning' },
+            { label: 'Ausencias', value: monthlyStats.totalAbsences, icon: XCircle, color: 'text-destructive' },
           ].map((stat, i) => (
             <div key={i} className="flex items-center gap-2 p-3 rounded-lg bg-muted/30">
               <stat.icon className={`w-4 h-4 ${stat.color}`} />

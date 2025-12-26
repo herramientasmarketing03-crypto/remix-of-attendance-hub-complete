@@ -9,6 +9,7 @@ export interface EmployeeTask {
   employee_id: string | null;
   assigned_to: string;
   assigned_by: string | null;
+  created_by_user_id: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'on_hold';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
@@ -26,6 +27,7 @@ export interface TaskInsert {
   employee_id?: string | null;
   assigned_to: string;
   assigned_by?: string | null;
+  created_by_user_id?: string | null;
   status?: string;
   priority?: string;
   category?: string;

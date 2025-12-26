@@ -99,7 +99,15 @@ const AttendancePage = () => {
           </TabsList>
 
           <TabsContent value="calendar">
-            <AttendanceCalendar />
+            <AttendanceCalendar 
+              records={records} 
+              employees={employees.map(e => ({
+                id: e.id,
+                name: e.name,
+                department: e.department,
+                position: e.position,
+              }))} 
+            />
           </TabsContent>
 
           <TabsContent value="list">
