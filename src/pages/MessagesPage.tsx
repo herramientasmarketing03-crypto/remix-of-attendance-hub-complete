@@ -1,38 +1,27 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { motion } from 'framer-motion';
 import { 
-  MessageSquare, Send, Mail, MailOpen, Clock, Paperclip, Plus, CheckCircle2, 
-  Inbox, SendHorizontal, Filter, Search, FileText, HelpCircle, Calendar, AlertCircle, Users
+  MessageSquare, Send, Mail, MailOpen, Clock, Plus, CheckCircle2, 
+  Inbox, SendHorizontal, Search, FileText, HelpCircle, Calendar, AlertCircle, Loader2
 } from 'lucide-react';
-import { mockMessages, mockEmployees } from '@/data/mockData';
-import { DEPARTMENTS, Employee } from '@/types/attendance';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '@/contexts/AuthContext';
-import { saveToStorage, loadFromStorage, STORAGE_KEYS } from '@/services/dataStorage';
-import { logAction } from '@/services/auditLog';
-import { AttendanceMessage } from '@/types/attendance';
+import { useMessages, type Message } from '@/hooks/useMessages';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-// Message categories
-type MessageCategory = 'justificacion' | 'consulta' | 'permiso' | 'vacaciones' | 'queja' | 'otro';
-
-interface ExtendedMessage extends AttendanceMessage {
-  category?: MessageCategory;
-}
+type MessageCategory = 'justificacion' | 'consulta' | 'permiso' | 'vacaciones' | 'queja' | 'otro' | 'general';
 
 const MESSAGE_CATEGORIES: Record<MessageCategory, { label: string; icon: typeof FileText; color: string }> = {
   justificacion: { label: 'Justificación', icon: FileText, color: 'bg-blue-500/10 text-blue-500' },
@@ -41,61 +30,44 @@ const MESSAGE_CATEGORIES: Record<MessageCategory, { label: string; icon: typeof 
   vacaciones: { label: 'Vacaciones', icon: Calendar, color: 'bg-orange-500/10 text-orange-500' },
   queja: { label: 'Queja/Reclamo', icon: AlertCircle, color: 'bg-red-500/10 text-red-500' },
   otro: { label: 'Otro', icon: MessageSquare, color: 'bg-gray-500/10 text-gray-500' },
+  general: { label: 'General', icon: MessageSquare, color: 'bg-gray-500/10 text-gray-500' },
 };
 
-// Recipient types
-type RecipientType = 'employee' | 'rrhh' | 'jefe' | 'gerencia';
+type RecipientType = 'rrhh' | 'jefe' | 'gerencia';
 
-const MessagesPage = () => {
+export default function MessagesPage() {
   const { user, profile } = useAuth();
-  const [messages, setMessages] = useState<ExtendedMessage[]>(() => 
-    loadFromStorage(STORAGE_KEYS.MESSAGES, mockMessages)
-  );
-  const [selectedMessage, setSelectedMessage] = useState<ExtendedMessage | null>(null);
+  const { messages, loading, sendMessage, markAsRead, markAsResolved } = useMessages(user?.id);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   
-  // Filter states
   const [activeFilter, setActiveFilter] = useState<'all' | 'received' | 'sent'>('all');
   const [categoryFilter, setCategoryFilter] = useState<MessageCategory | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // New message form
   const [recipientType, setRecipientType] = useState<RecipientType>('rrhh');
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
   const [newCategory, setNewCategory] = useState<MessageCategory>('consulta');
   const [newSubject, setNewSubject] = useState('');
   const [newMessageText, setNewMessageText] = useState('');
-  
-  // Reply form
   const [replyText, setReplyText] = useState('');
 
-  const currentUserId = user?.id || 'current-user';
+  const currentUserId = user?.id || '';
   const currentUserName = `${profile?.nombres || 'Usuario'} ${profile?.apellidos || ''}`.trim();
 
-  useEffect(() => {
-    saveToStorage(STORAGE_KEYS.MESSAGES, messages);
-  }, [messages]);
-
-  // Filter messages
   const filteredMessages = useMemo(() => {
     return messages.filter(msg => {
-      // Filter by sent/received
-      if (activeFilter === 'sent' && msg.fromUserId !== currentUserId) return false;
-      if (activeFilter === 'received' && msg.toUserId !== currentUserId) return false;
-      
-      // Filter by category
+      if (activeFilter === 'sent' && msg.from_user_id !== currentUserId) return false;
+      if (activeFilter === 'received' && msg.to_user_id !== currentUserId) return false;
       if (categoryFilter !== 'all' && msg.category !== categoryFilter) return false;
       
-      // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return (
           msg.subject.toLowerCase().includes(search) ||
           msg.message.toLowerCase().includes(search) ||
-          msg.fromUserName.toLowerCase().includes(search) ||
-          msg.toUserName.toLowerCase().includes(search)
+          msg.from_user_name.toLowerCase().includes(search) ||
+          msg.to_user_name.toLowerCase().includes(search)
         );
       }
       
@@ -103,18 +75,14 @@ const MessagesPage = () => {
     });
   }, [messages, activeFilter, categoryFilter, searchTerm, currentUserId]);
 
-  // Stats
   const stats = useMemo(() => {
-    const received = messages.filter(m => m.toUserId === currentUserId);
-    const sent = messages.filter(m => m.fromUserId === currentUserId);
-    const unread = received.filter(m => !m.readAt);
+    const received = messages.filter(m => m.to_user_id === currentUserId);
+    const sent = messages.filter(m => m.from_user_id === currentUserId);
+    const unread = received.filter(m => !m.read_at);
     return { received: received.length, sent: sent.length, unread: unread.length };
   }, [messages, currentUserId]);
 
   const getRecipientName = () => {
-    if (recipientType === 'employee' && selectedEmployee) {
-      return selectedEmployee.name;
-    }
     switch (recipientType) {
       case 'rrhh': return 'Recursos Humanos';
       case 'jefe': return 'Mi Jefe Directo';
@@ -123,121 +91,84 @@ const MessagesPage = () => {
     }
   };
 
-  const getRecipientId = () => {
-    if (recipientType === 'employee' && selectedEmployee) {
-      return selectedEmployee.id;
-    }
-    return recipientType;
-  };
-
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newSubject || !newMessageText) {
       toast.error('Complete todos los campos requeridos');
       return;
     }
 
-    if (recipientType === 'employee' && !selectedEmployee) {
-      toast.error('Seleccione un empleado');
-      return;
+    try {
+      await sendMessage({
+        from_user_id: currentUserId,
+        from_user_name: currentUserName,
+        to_user_id: recipientType,
+        to_user_name: getRecipientName(),
+        to_user_type: recipientType,
+        subject: newSubject,
+        message: newMessageText,
+        category: newCategory,
+      });
+      
+      setDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
-
-    const newMessage: ExtendedMessage = {
-      id: `msg-${Date.now()}`,
-      fromUserId: currentUserId,
-      fromUserName: currentUserName,
-      toUserId: getRecipientId(),
-      toUserName: getRecipientName(),
-      department: 'ti',
-      subject: newSubject,
-      message: newMessageText,
-      category: newCategory,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages(prev => [newMessage, ...prev]);
-    
-    logAction('CREATE', 'message', newMessage.id, currentUserId, currentUserName, 
-      `Envió mensaje: ${newSubject} (${MESSAGE_CATEGORIES[newCategory].label})`);
-    
-    toast.success('Mensaje enviado correctamente');
-    setDialogOpen(false);
-    resetForm();
   };
 
   const resetForm = () => {
     setRecipientType('rrhh');
-    setSelectedEmployee(null);
     setNewCategory('consulta');
     setNewSubject('');
     setNewMessageText('');
   };
 
-  const handleMarkAsRead = (message: ExtendedMessage) => {
-    if (!message.readAt && message.toUserId === currentUserId) {
-      setMessages(prev => prev.map(m => 
-        m.id === message.id ? { ...m, readAt: new Date().toISOString() } : m
-      ));
+  const handleSelectMessage = async (msg: Message) => {
+    setSelectedMessage(msg);
+    if (!msg.read_at && msg.to_user_id === currentUserId) {
+      await markAsRead(msg.id);
     }
   };
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!selectedMessage || !replyText) {
       toast.error('Escriba un mensaje de respuesta');
       return;
     }
 
-    const replyMessage: ExtendedMessage = {
-      id: `msg-${Date.now()}`,
-      fromUserId: currentUserId,
-      fromUserName: currentUserName,
-      toUserId: selectedMessage.fromUserId,
-      toUserName: selectedMessage.fromUserName,
-      department: selectedMessage.department,
-      subject: `Re: ${selectedMessage.subject}`,
-      message: replyText,
-      category: selectedMessage.category,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages(prev => [
-      replyMessage,
-      ...prev.map(m => m.id === selectedMessage.id ? { ...m, replied: true } : m)
-    ]);
-
-    logAction('UPDATE', 'message', selectedMessage.id, currentUserId, currentUserName, 
-      `Respondió mensaje: ${selectedMessage.subject}`);
-
-    toast.success('Respuesta enviada');
-    setReplyDialogOpen(false);
-    setReplyText('');
+    try {
+      await sendMessage({
+        from_user_id: currentUserId,
+        from_user_name: currentUserName,
+        to_user_id: selectedMessage.from_user_id,
+        to_user_name: selectedMessage.from_user_name,
+        to_user_type: 'employee',
+        subject: `Re: ${selectedMessage.subject}`,
+        message: replyText,
+        category: selectedMessage.category as MessageCategory || 'general',
+      });
+      
+      setReplyDialogOpen(false);
+      setReplyText('');
+    } catch (error) {
+      console.error('Error replying:', error);
+    }
   };
 
-  const handleMarkAsResolved = () => {
+  const handleMarkAsResolved = async () => {
     if (!selectedMessage) return;
-
-    setMessages(prev => prev.map(m => 
-      m.id === selectedMessage.id ? { ...m, replied: true } : m
-    ));
-
-    logAction('UPDATE', 'message', selectedMessage.id, currentUserId, currentUserName, 
-      `Marcó como resuelto: ${selectedMessage.subject}`);
-
-    toast.success('Mensaje marcado como resuelto');
-    setSelectedMessage(prev => prev ? { ...prev, replied: true } : null);
-  };
-
-  const handleSelectMessage = (msg: ExtendedMessage) => {
-    setSelectedMessage(msg);
-    handleMarkAsRead(msg);
+    await markAsResolved(selectedMessage.id);
+    setSelectedMessage(prev => prev ? { ...prev, resolved: true } : null);
   };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const getCategoryBadge = (category?: MessageCategory) => {
+  const getCategoryBadge = (category?: string | null) => {
     if (!category) return null;
-    const cat = MESSAGE_CATEGORIES[category];
+    const cat = MESSAGE_CATEGORIES[category as MessageCategory];
+    if (!cat) return null;
     const Icon = cat.icon;
     return (
       <Badge variant="secondary" className={`gap-1 ${cat.color}`}>
@@ -246,6 +177,16 @@ const MessagesPage = () => {
       </Badge>
     );
   };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -259,7 +200,7 @@ const MessagesPage = () => {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gradient-primary">
+              <Button>
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Mensaje
               </Button>
@@ -269,90 +210,20 @@ const MessagesPage = () => {
                 <DialogTitle>Enviar Mensaje</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                {/* Recipient Type */}
                 <div className="space-y-2">
-                  <Label>Tipo de Destinatario</Label>
-                  <Select value={recipientType} onValueChange={(v) => {
-                    setRecipientType(v as RecipientType);
-                    setSelectedEmployee(null);
-                  }}>
+                  <Label>Destinatario</Label>
+                  <Select value={recipientType} onValueChange={(v) => setRecipientType(v as RecipientType)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
+                      <SelectValue placeholder="Seleccionar" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="rrhh">Recursos Humanos</SelectItem>
                       <SelectItem value="jefe">Mi Jefe Directo</SelectItem>
                       <SelectItem value="gerencia">Gerencia General</SelectItem>
-                      <SelectItem value="employee">Empleado Específico</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Employee Selector */}
-                {recipientType === 'employee' && (
-                  <div className="space-y-2">
-                    <Label>Seleccionar Empleado</Label>
-                    <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start">
-                          {selectedEmployee ? (
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                  {getInitials(selectedEmployee.name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span>{selectedEmployee.name}</span>
-                              <Badge variant="secondary" className="ml-auto text-xs">
-                                {DEPARTMENTS[selectedEmployee.department]?.name}
-                              </Badge>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">Buscar empleado...</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Buscar por nombre..." />
-                          <CommandList>
-                            <CommandEmpty>No se encontraron empleados</CommandEmpty>
-                            <CommandGroup>
-                              {mockEmployees.map(emp => (
-                                <CommandItem
-                                  key={emp.id}
-                                  value={emp.name}
-                                  onSelect={() => {
-                                    setSelectedEmployee(emp);
-                                    setEmployeeSearchOpen(false);
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  <div className="flex items-center gap-2 w-full">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                        {getInitials(emp.name)}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                      <p className="text-sm font-medium">{emp.name}</p>
-                                      <p className="text-xs text-muted-foreground">{emp.position}</p>
-                                    </div>
-                                    <Badge variant="outline" className="text-xs">
-                                      {DEPARTMENTS[emp.department]?.name}
-                                    </Badge>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
-
-                {/* Category */}
                 <div className="space-y-2">
                   <Label>Categoría</Label>
                   <Select value={newCategory} onValueChange={(v) => setNewCategory(v as MessageCategory)}>
@@ -375,7 +246,6 @@ const MessagesPage = () => {
                   </Select>
                 </div>
 
-                {/* Subject */}
                 <div className="space-y-2">
                   <Label>Asunto *</Label>
                   <Input 
@@ -385,7 +255,6 @@ const MessagesPage = () => {
                   />
                 </div>
 
-                {/* Message */}
                 <div className="space-y-2">
                   <Label>Mensaje *</Label>
                   <Textarea 
@@ -396,13 +265,7 @@ const MessagesPage = () => {
                   />
                 </div>
 
-                {/* Attachment */}
-                <div className="space-y-2">
-                  <Label>Adjuntar Evidencia (opcional)</Label>
-                  <Input type="file" />
-                </div>
-
-                <Button className="w-full gradient-primary" onClick={handleSend}>
+                <Button className="w-full" onClick={handleSend}>
                   <Send className="w-4 h-4 mr-2" />
                   Enviar Mensaje
                 </Button>
@@ -414,7 +277,7 @@ const MessagesPage = () => {
         {/* Stats Cards */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card 
-            className={`glass-card cursor-pointer transition-all ${activeFilter === 'received' ? 'ring-2 ring-primary' : ''}`}
+            className={`cursor-pointer transition-all ${activeFilter === 'received' ? 'ring-2 ring-primary' : ''}`}
             onClick={() => setActiveFilter(activeFilter === 'received' ? 'all' : 'received')}
           >
             <CardContent className="py-4">
@@ -426,14 +289,11 @@ const MessagesPage = () => {
                   <p className="text-2xl font-bold">{stats.received}</p>
                   <p className="text-sm text-muted-foreground">Recibidos</p>
                 </div>
-                {stats.unread > 0 && (
-                  <Badge className="ml-auto">{stats.unread} nuevos</Badge>
-                )}
               </div>
             </CardContent>
           </Card>
           <Card 
-            className={`glass-card cursor-pointer transition-all ${activeFilter === 'sent' ? 'ring-2 ring-primary' : ''}`}
+            className={`cursor-pointer transition-all ${activeFilter === 'sent' ? 'ring-2 ring-primary' : ''}`}
             onClick={() => setActiveFilter(activeFilter === 'sent' ? 'all' : 'sent')}
           >
             <CardContent className="py-4">
@@ -448,230 +308,190 @@ const MessagesPage = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card">
+          <Card>
             <CardContent className="py-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-primary/10">
-                  <MessageSquare className="w-5 h-5 text-primary" />
+                <div className="p-2 rounded-full bg-warning/10">
+                  <Clock className="w-5 h-5 text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{messages.length}</p>
-                  <p className="text-sm text-muted-foreground">Total</p>
+                  <p className="text-2xl font-bold">{stats.unread}</p>
+                  <p className="text-sm text-muted-foreground">Sin leer</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Message List */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Filters */}
-            <Card className="glass-card">
-              <CardContent className="py-3 space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Buscar mensajes..." 
-                    className="pl-10" 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as MessageCategory | 'all')}>
-                  <SelectTrigger className="w-full">
-                    <Filter className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Filtrar por categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las categorías</SelectItem>
-                    {Object.entries(MESSAGE_CATEGORIES).map(([key, cat]) => (
-                      <SelectItem key={key} value={key}>{cat.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar mensajes..." 
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as MessageCategory | 'all')}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las categorías</SelectItem>
+                  {Object.entries(MESSAGE_CATEGORIES).map(([key, cat]) => (
+                    <SelectItem key={key} value={key}>{cat.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
-            {/* Messages */}
-            <Card className="glass-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    {activeFilter === 'sent' ? <SendHorizontal className="w-5 h-5 text-primary" /> : 
-                     activeFilter === 'received' ? <Inbox className="w-5 h-5 text-primary" /> :
-                     <MessageSquare className="w-5 h-5 text-primary" />}
-                    {activeFilter === 'sent' ? 'Enviados' : activeFilter === 'received' ? 'Recibidos' : 'Todos'}
-                  </span>
-                  <Badge variant="outline">{filteredMessages.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-[500px] overflow-y-auto">
+        {/* Messages List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="h-[600px] flex flex-col">
+            <CardContent className="p-0 flex-1 overflow-auto">
+              <div className="divide-y">
                 {filteredMessages.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <div className="p-8 text-center text-muted-foreground">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No hay mensajes</p>
                   </div>
                 ) : (
-                  filteredMessages.map((msg, index) => {
-                    const isRead = !!msg.readAt;
-                    const isSelected = selectedMessage?.id === msg.id;
-                    const isResolved = !!msg.replied;
-                    const isSent = msg.fromUserId === currentUserId;
-                    
-                    return (
-                      <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.03 }}
-                        className={`p-4 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/30 hover:bg-muted/50'}`}
-                        onClick={() => handleSelectMessage(msg)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                              {getInitials(isSent ? msg.toUserName : msg.fromUserName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className={`text-sm truncate ${!isRead && !isSent ? 'font-semibold' : ''}`}>
-                                {isSent ? `Para: ${msg.toUserName}` : msg.fromUserName}
-                              </p>
-                              <div className="flex items-center gap-1">
-                                {isResolved && <CheckCircle2 className="w-3 h-3 text-success" />}
-                                {!isRead && !isSent && <span className="w-2 h-2 rounded-full bg-primary" />}
-                                {isSent && <SendHorizontal className="w-3 h-3 text-muted-foreground" />}
-                              </div>
-                            </div>
-                            <p className="text-sm font-medium truncate">{msg.subject}</p>
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              {msg.category && getCategoryBadge(msg.category)}
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {format(new Date(msg.createdAt), "d MMM", { locale: es })}
-                              </span>
-                            </div>
+                  filteredMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`p-4 cursor-pointer hover:bg-muted/50 transition-colors ${
+                        selectedMessage?.id === msg.id ? 'bg-muted/50' : ''
+                      } ${!msg.read_at && msg.to_user_id === currentUserId ? 'bg-primary/5' : ''}`}
+                      onClick={() => handleSelectMessage(msg)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(msg.from_user_id === currentUserId ? msg.to_user_name : msg.from_user_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate">
+                              {msg.from_user_id === currentUserId ? `Para: ${msg.to_user_name}` : msg.from_user_name}
+                            </p>
+                            {!msg.read_at && msg.to_user_id === currentUserId && (
+                              <Badge variant="secondary" className="text-xs">Nuevo</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm font-medium truncate">{msg.subject}</p>
+                          <p className="text-xs text-muted-foreground truncate">{msg.message}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {getCategoryBadge(msg.category)}
+                            <span className="text-xs text-muted-foreground">
+                              {format(parseISO(msg.created_at || new Date().toISOString()), 'dd MMM', { locale: es })}
+                            </span>
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  })
+                      </div>
+                    </div>
+                  ))
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Message Detail */}
-          <div className="lg:col-span-2">
-            {selectedMessage ? (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="glass-card h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl">{selectedMessage.subject}</CardTitle>
-                        <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                              {getInitials(selectedMessage.fromUserName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>De: <strong>{selectedMessage.fromUserName}</strong></span>
-                          <span>·</span>
-                          <span>Para: <strong>{selectedMessage.toUserName}</strong></span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 items-end">
-                        {selectedMessage.category && getCategoryBadge(selectedMessage.category)}
-                        {selectedMessage.replied && (
-                          <Badge className="bg-success/10 text-success">Resuelto</Badge>
-                        )}
+          <Card className="h-[600px] flex flex-col">
+            <CardContent className="p-6 flex-1 overflow-auto">
+              {selectedMessage ? (
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {getInitials(selectedMessage.from_user_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold">{selectedMessage.from_user_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Para: {selectedMessage.to_user_name}
+                        </p>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="p-4 rounded-xl bg-muted/30">
-                      <p className="whitespace-pre-wrap">{selectedMessage.message}</p>
-                    </div>
-                    
-                    {selectedMessage.attachmentUrl && (
-                      <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
-                        <Paperclip className="w-4 h-4 text-primary" />
-                        <span className="text-sm">Archivo adjunto: {selectedMessage.attachmentUrl}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        <span>Enviado: {format(new Date(selectedMessage.createdAt), "PPPP 'a las' HH:mm", { locale: es })}</span>
-                      </div>
-                      {selectedMessage.readAt && (
-                        <div className="flex items-center gap-2">
-                          <MailOpen className="w-4 h-4" />
-                          <span>Leído: {format(new Date(selectedMessage.readAt), "PPPP 'a las' HH:mm", { locale: es })}</span>
-                        </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">
+                        {format(parseISO(selectedMessage.created_at || new Date().toISOString()), 'PPP', { locale: es })}
+                      </p>
+                      {selectedMessage.resolved && (
+                        <Badge className="bg-success/10 text-success mt-1">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Resuelto
+                        </Badge>
                       )}
                     </div>
-                    
-                    <div className="flex gap-2 flex-wrap">
-                      <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button className="gradient-primary">
-                            <Send className="w-4 h-4 mr-2" />
-                            Responder
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Responder a: {selectedMessage.subject}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="p-3 rounded-lg bg-muted/30 text-sm">
-                              <p className="font-medium">{selectedMessage.fromUserName} escribió:</p>
-                              <p className="text-muted-foreground mt-1 line-clamp-3">{selectedMessage.message}</p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Tu respuesta</Label>
-                              <Textarea 
-                                placeholder="Escribe tu respuesta..." 
-                                rows={4}
-                                value={replyText}
-                                onChange={(e) => setReplyText(e.target.value)}
-                              />
-                            </div>
-                            <Button className="w-full" onClick={handleReply}>
-                              <Send className="w-4 h-4 mr-2" />
-                              Enviar Respuesta
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      {!selectedMessage.replied && selectedMessage.toUserId === currentUserId && (
-                        <Button variant="outline" onClick={handleMarkAsResolved}>
-                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Marcar como resuelto
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold">{selectedMessage.subject}</h3>
+                    {getCategoryBadge(selectedMessage.category)}
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="whitespace-pre-wrap">{selectedMessage.message}</p>
+                  </div>
+
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="flex-1">
+                          <Send className="w-4 h-4 mr-2" />
+                          Responder
                         </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : (
-              <Card className="glass-card h-full flex items-center justify-center min-h-[400px]">
-                <div className="text-center text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                  <p>Selecciona un mensaje para ver los detalles</p>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Responder a {selectedMessage.from_user_name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="p-3 rounded-lg bg-muted/50">
+                            <p className="text-sm text-muted-foreground">Re: {selectedMessage.subject}</p>
+                          </div>
+                          <Textarea 
+                            placeholder="Escribe tu respuesta..." 
+                            rows={4}
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                          />
+                          <Button className="w-full" onClick={handleReply}>
+                            <Send className="w-4 h-4 mr-2" />
+                            Enviar Respuesta
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    {!selectedMessage.resolved && (
+                      <Button variant="outline" onClick={handleMarkAsResolved}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Marcar Resuelto
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </Card>
-            )}
-          </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <Mail className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>Selecciona un mensaje para ver los detalles</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </MainLayout>
   );
-};
-
-export default MessagesPage;
+}
