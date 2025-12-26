@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -13,9 +13,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/layout/NotificationBell';
+import { useNavigate } from 'react-router-dom';
 
 export function Header() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const initials = profile ? `${profile.nombres?.[0] || ''}${profile.apellidos?.[0] || ''}`.toUpperCase() : 'U';
 
   return (
@@ -52,10 +54,18 @@ export function Header() {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Perfil</DropdownMenuItem>
-            <DropdownMenuItem>Configuración</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/my-account')} className="cursor-pointer">
+              <User className="w-4 h-4 mr-2" />
+              Mi Perfil
+            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
+                <Settings className="w-4 h-4 mr-2" />
+                Configuración
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="text-destructive">
+            <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
               Cerrar Sesión
             </DropdownMenuItem>
           </DropdownMenuContent>

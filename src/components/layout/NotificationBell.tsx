@@ -1,4 +1,4 @@
-import { Bell, Check, X, AlertTriangle, FileText, Clock, Users, ListTodo } from 'lucide-react';
+import { Bell, Check, X, AlertTriangle, FileText, Clock, Users, ListTodo, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -23,6 +23,7 @@ const notificationIcons: Record<NotificationType, typeof Bell> = {
   vacation_request: Users,
   evaluation_pending: Users,
   attendance_issue: Clock,
+  message: MessageSquare,
   general: Bell,
 };
 
