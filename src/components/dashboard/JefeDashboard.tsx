@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Users, Clock, Timer, TrendingUp, MessageSquare } from 'lucide-react';
+import { Users, Clock, Timer, TrendingUp, MessageSquare, AlertTriangle, Gavel } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,34 @@ import { mockDepartmentStats, mockEmployees, mockAttendanceRecords } from '@/dat
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { DEPARTMENTS, Department } from '@/types/attendance';
 
 export function JefeDashboard() {
   const navigate = useNavigate();
+  const { userRole } = useAuth();
   
-  // Mock: assume jefe is from TI department
-  const deptStats = mockDepartmentStats.find(s => s.department === 'ti')!;
-  const deptEmployees = mockEmployees.filter(e => e.department === 'ti');
+  // Dynamic area based on user's area_id
+  const areaId = (userRole?.area_id || 'ti') as Department;
+  const areaName = DEPARTMENTS[areaId]?.name || 'Mi Departamento';
+  
+  const deptStats = mockDepartmentStats.find(s => s.department === areaId);
+  const deptEmployees = mockEmployees.filter(e => e.department === areaId);
+
+  // Get today's tardies for the department
+  const today = new Date().toISOString().split('T')[0];
+  const todayRecords = mockAttendanceRecords.filter(
+    r => deptEmployees.some(e => e.id === r.employeeId) && r.date === today
+  );
+  const tardiesCount = todayRecords.filter(r => r.tardyCount > 0).length;
+
+  if (!deptStats) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">No hay datos disponibles para tu departamento.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -21,9 +42,35 @@ export function JefeDashboard() {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        <h1 className="text-2xl font-bold">Mi Departamento - TI</h1>
+        <h1 className="text-2xl font-bold">Mi Departamento - {areaName}</h1>
         <p className="text-muted-foreground">Gestiona la asistencia de tu equipo</p>
       </motion.div>
+
+      {/* Tardies alert for today */}
+      {tardiesCount > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <Card className="border-warning/20 bg-warning/5">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-2 rounded-full bg-warning/10">
+                  <AlertTriangle className="w-5 h-5 text-warning" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{tardiesCount} empleado(s) con tardanza hoy</p>
+                  <p className="text-sm text-muted-foreground">Revisa los registros de asistencia</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate('/attendance')}>
+                  Ver detalles
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -66,30 +113,40 @@ export function JefeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {deptEmployees.slice(0, 5).map((employee, index) => (
-                <motion.div
-                  key={employee.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {employee.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-sm">{employee.name}</p>
-                      <p className="text-xs text-muted-foreground">{employee.position}</p>
+              {deptEmployees.slice(0, 5).map((employee, index) => {
+                const empRecord = todayRecords.find(r => r.employeeId === employee.id);
+                const isPresent = empRecord && empRecord.daysAttended > 0;
+                const hasTardy = empRecord && empRecord.tardyCount > 0;
+                
+                return (
+                  <motion.div
+                    key={employee.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {employee.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-sm">{employee.name}</p>
+                        <p className="text-xs text-muted-foreground">{employee.position}</p>
+                      </div>
                     </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-success/10 text-success">
-                    Presente
-                  </Badge>
-                </motion.div>
-              ))}
+                    <Badge variant="secondary" className={
+                      hasTardy ? 'bg-warning/10 text-warning' :
+                      isPresent ? 'bg-success/10 text-success' :
+                      'bg-muted text-muted-foreground'
+                    }>
+                      {hasTardy ? 'Tardanza' : isPresent ? 'Presente' : 'Sin registro'}
+                    </Badge>
+                  </motion.div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -106,9 +163,13 @@ export function JefeDashboard() {
               <Clock className="w-4 h-4 mr-2" />
               Ver asistencia del equipo
             </Button>
-            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/messages')}>
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/justifications')}>
               <MessageSquare className="w-4 h-4 mr-2" />
               Enviar justificación
+            </Button>
+            <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/sanctions')}>
+              <Gavel className="w-4 h-4 mr-2" />
+              Solicitar sanción
             </Button>
             <Button variant="outline" className="w-full justify-start" onClick={() => navigate('/requirements')}>
               <Users className="w-4 h-4 mr-2" />

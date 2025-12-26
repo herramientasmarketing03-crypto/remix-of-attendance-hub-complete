@@ -6,6 +6,7 @@ export type AppRole = 'admin_rrhh' | 'jefe_area' | 'empleado';
 interface UserRole {
   role: AppRole;
   area_id: string | null;
+  employeeId: string | null;
 }
 
 interface User {
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nombres: demoUser.nombres,
           apellidos: demoUser.apellidos,
         };
-        const newRole = { role: demoUser.role, area_id: demoUser.area_id };
+        const newRole = { role: demoUser.role, area_id: demoUser.area_id, employeeId: demoUser.employeeId };
         
         setUser(newUser);
         setUserRole(newRole);
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           nombres: 'Usuario',
           apellidos: 'Demo',
         };
-        const newRole = { role: 'empleado' as AppRole, area_id: null };
+        const newRole = { role: 'empleado' as AppRole, area_id: null, employeeId: null };
         
         setUser(newUser);
         setUserRole(newRole);
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         nombres,
         apellidos,
       };
-      const newRole = { role: 'empleado' as AppRole, area_id: null };
+      const newRole = { role: 'empleado' as AppRole, area_id: null, employeeId: null };
       
       setUser(newUser);
       setUserRole(newRole);

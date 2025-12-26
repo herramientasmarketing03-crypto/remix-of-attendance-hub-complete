@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
-import { FileCheck, Search, Plus, AlertTriangle, DollarSign, User, Eye, RefreshCw, FileText } from 'lucide-react';
+import { FileCheck, Search, Plus, AlertTriangle, DollarSign, User, Eye, RefreshCw, FileText, Clock } from 'lucide-react';
 import { mockContracts, mockEmployees, CONTRACT_TYPES } from '@/data/mockData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,10 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getDaysUntilExpiration, getContractAlerts, groupAlertsByLevel } from '@/services/contractAlerts';
 
 const ContractsPage = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterAlert, setFilterAlert] = useState('all');
   const [newContractOpen, setNewContractOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<any>(null);
@@ -34,15 +36,48 @@ const ContractsPage = () => {
 
   const contractsWithEmployee = mockContracts.map(contract => {
     const employee = mockEmployees.find(e => e.id === contract.employeeId);
-    return { ...contract, employee };
+    const daysRemaining = getDaysUntilExpiration(contract.endDate);
+    return { ...contract, employee, daysRemaining };
   });
+
+  // Get alerts
+  const alerts = getContractAlerts(mockContracts);
+  const alertsByLevel = groupAlertsByLevel(alerts);
 
   const filteredContracts = contractsWithEmployee.filter(c => {
     const matchesSearch = c.employee?.name.toLowerCase().includes(search.toLowerCase()) ||
       c.position.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === 'all' || c.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    
+    // Alert filter
+    let matchesAlert = true;
+    if (filterAlert !== 'all') {
+      const alert = alerts.find(a => a.contract.id === c.id);
+      if (filterAlert === 'critical') matchesAlert = alert?.level === 'critical';
+      else if (filterAlert === 'warning') matchesAlert = alert?.level === 'warning';
+      else if (filterAlert === 'info') matchesAlert = alert?.level === 'info';
+      else if (filterAlert === 'none') matchesAlert = !alert;
+    }
+    
+    return matchesSearch && matchesStatus && matchesAlert;
   });
+
+  const getAlertBadge = (daysRemaining: number | null) => {
+    if (daysRemaining === null) return null;
+    if (daysRemaining <= 0) {
+      return <Badge variant="destructive" className="gap-1"><Clock className="w-3 h-3" />Vencido</Badge>;
+    }
+    if (daysRemaining <= 7) {
+      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" />{daysRemaining}d</Badge>;
+    }
+    if (daysRemaining <= 15) {
+      return <Badge variant="warning" className="gap-1"><Clock className="w-3 h-3" />{daysRemaining}d</Badge>;
+    }
+    if (daysRemaining <= 30) {
+      return <Badge variant="secondary" className="gap-1"><Clock className="w-3 h-3" />{daysRemaining}d</Badge>;
+    }
+    return null;
+  };
 
   const getStatusBadge = (status: string) => {
     const config = {
@@ -53,8 +88,6 @@ const ContractsPage = () => {
     const { label, variant } = config[status as keyof typeof config] || { label: status, variant: 'secondary' as const };
     return <Badge variant={variant}>{label}</Badge>;
   };
-
-  const expiringContracts = contractsWithEmployee.filter(c => c.status === 'pending_renewal');
 
   return (
     <MainLayout>
@@ -152,7 +185,10 @@ const ContractsPage = () => {
                       <h3 className="text-xl font-bold">{selectedContract.employee?.name}</h3>
                       <p className="text-muted-foreground">{selectedContract.position}</p>
                     </div>
-                    {getStatusBadge(selectedContract.status)}
+                    <div className="flex gap-2">
+                      {getAlertBadge(selectedContract.daysRemaining)}
+                      {getStatusBadge(selectedContract.status)}
+                    </div>
                   </div>
 
                   <Tabs defaultValue="info" className="w-full">
@@ -177,6 +213,15 @@ const ContractsPage = () => {
                         <div className="p-4 rounded-lg bg-muted/50">
                           <p className="text-xs text-muted-foreground mb-1">Fecha de Fin</p>
                           <p className="font-medium">{selectedContract.endDate || 'Indefinido'}</p>
+                          {selectedContract.daysRemaining !== null && selectedContract.daysRemaining <= 30 && (
+                            <p className={`text-sm mt-1 ${
+                              selectedContract.daysRemaining <= 7 ? 'text-destructive' :
+                              selectedContract.daysRemaining <= 15 ? 'text-warning' :
+                              'text-muted-foreground'
+                            }`}>
+                              {selectedContract.daysRemaining <= 0 ? 'Vencido' : `${selectedContract.daysRemaining} días restantes`}
+                            </p>
+                          )}
                         </div>
                         <div className="p-4 rounded-lg bg-muted/50 col-span-2">
                           <p className="text-xs text-muted-foreground mb-1">Salario Mensual</p>
@@ -206,33 +251,65 @@ const ContractsPage = () => {
           </Dialog>
         </motion.div>
 
-        {expiringContracts.length > 0 && (
+        {/* Alert Summary Cards */}
+        {alerts.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="border-warning/20 bg-warning/5">
-              <CardContent className="py-4">
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-full bg-warning/10">
-                    <AlertTriangle className="w-5 h-5 text-warning" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold mb-2">Contratos por vencer</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {expiringContracts.map(c => (
-                        <Badge key={c.id} variant="warning">
-                          {c.employee?.name} - Vence: {c.endDate}
-                        </Badge>
-                      ))}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {alertsByLevel.critical.length > 0 && (
+                <Card className="border-destructive/20 bg-destructive/5 cursor-pointer hover:bg-destructive/10 transition-colors" 
+                      onClick={() => setFilterAlert('critical')}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-destructive/10">
+                        <AlertTriangle className="w-5 h-5 text-destructive" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-destructive">{alertsByLevel.critical.length} Críticos</p>
+                        <p className="text-sm text-muted-foreground">Vencen en 7 días o menos</p>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              )}
+              {alertsByLevel.warning.length > 0 && (
+                <Card className="border-warning/20 bg-warning/5 cursor-pointer hover:bg-warning/10 transition-colors"
+                      onClick={() => setFilterAlert('warning')}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-warning/10">
+                        <Clock className="w-5 h-5 text-warning" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-warning">{alertsByLevel.warning.length} Por Renovar</p>
+                        <p className="text-sm text-muted-foreground">Vencen en 15 días</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {alertsByLevel.info.length > 0 && (
+                <Card className="border-primary/20 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors"
+                      onClick={() => setFilterAlert('info')}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <FileCheck className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-primary">{alertsByLevel.info.length} Aviso</p>
+                        <p className="text-sm text-muted-foreground">Vencen en 30 días</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </motion.div>
         )}
 
         <Card className="glass-card">
           <CardHeader>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input placeholder="Buscar por nombre o cargo..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -248,6 +325,23 @@ const ContractsPage = () => {
                   <SelectItem value="expired">Vencidos</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={filterAlert} onValueChange={setFilterAlert}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Alerta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las alertas</SelectItem>
+                  <SelectItem value="critical">Críticos (≤7d)</SelectItem>
+                  <SelectItem value="warning">Próximos (≤15d)</SelectItem>
+                  <SelectItem value="info">Aviso (≤30d)</SelectItem>
+                  <SelectItem value="none">Sin alerta</SelectItem>
+                </SelectContent>
+              </Select>
+              {filterAlert !== 'all' && (
+                <Button variant="ghost" size="sm" onClick={() => setFilterAlert('all')}>
+                  Limpiar filtro
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -261,6 +355,7 @@ const ContractsPage = () => {
                     <TableHead>Departamento</TableHead>
                     <TableHead>Inicio</TableHead>
                     <TableHead>Fin</TableHead>
+                    <TableHead>Días Rest.</TableHead>
                     <TableHead>Salario</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead></TableHead>
@@ -286,6 +381,9 @@ const ContractsPage = () => {
                       </TableCell>
                       <TableCell>{contract.startDate}</TableCell>
                       <TableCell>{contract.endDate || '-'}</TableCell>
+                      <TableCell>
+                        {getAlertBadge(contract.daysRemaining)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <DollarSign className="w-3 h-3 text-muted-foreground" />
