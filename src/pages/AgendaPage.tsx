@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { mockActivities } from '@/data/hrmData';
-import { mockEmployees } from '@/data/mockData';
-import { format, isToday, isTomorrow, isThisWeek, parseISO, differenceInDays } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useActivities, Activity } from '@/hooks/useActivities';
+import { useEmployees } from '@/hooks/useEmployees';
+import { format, isToday, isTomorrow, isThisWeek, parseISO, differenceInDays, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Calendar as CalendarIcon, 
@@ -25,8 +26,6 @@ import {
   Bell,
   Filter
 } from 'lucide-react';
-import { Activity } from '@/types/hrm';
-import { toast } from 'sonner';
 
 const getActivityIcon = (type: Activity['type']) => {
   switch (type) {
@@ -35,7 +34,7 @@ const getActivityIcon = (type: Activity['type']) => {
     case 'training': return <GraduationCap className="w-4 h-4" />;
     case 'deadline': return <Clock className="w-4 h-4" />;
     case 'event': return <PartyPopper className="w-4 h-4" />;
-    case 'anniversary': return <Cake className="w-4 h-4" />;
+    case 'reminder': return <Bell className="w-4 h-4" />;
     default: return <CalendarIcon className="w-4 h-4" />;
   }
 };
@@ -47,13 +46,14 @@ const getActivityColor = (type: Activity['type']) => {
     case 'training': return 'bg-info/10 text-info border-info/20';
     case 'deadline': return 'bg-destructive/10 text-destructive border-destructive/20';
     case 'event': return 'bg-success/10 text-success border-success/20';
-    case 'anniversary': return 'bg-warning/10 text-warning border-warning/20';
+    case 'reminder': return 'bg-warning/10 text-warning border-warning/20';
     default: return 'bg-muted text-muted-foreground';
   }
 };
 
 export default function AgendaPage() {
-  const [activities, setActivities] = useState<Activity[]>(mockActivities);
+  const { activities, loading, createActivity } = useActivities();
+  const { employees } = useEmployees();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [filterType, setFilterType] = useState<string>('all');
   const [isNewActivityOpen, setIsNewActivityOpen] = useState(false);
@@ -63,22 +63,50 @@ export default function AgendaPage() {
     date: '',
     time: '',
     type: 'meeting' as Activity['type'],
-    priority: 'media' as Activity['priority'],
+    priority: 'medium' as Activity['priority'],
   });
 
-  // Obtener cumpleaños de la semana
-  const upcomingBirthdays = activities.filter(a => 
-    a.type === 'birthday' && 
-    isThisWeek(parseISO(a.date))
+  // Generate birthdays from employees
+  const today = new Date();
+  const employeeBirthdays = employees
+    .filter(e => e.hire_date && isSameMonth(parseISO(e.hire_date), today))
+    .map(e => ({
+      id: `birthday-${e.id}`,
+      title: `Cumpleaños de ${e.name}`,
+      date: e.hire_date!,
+      type: 'birthday' as const,
+      priority: 'medium' as const,
+    }));
+
+  const allActivities = [...activities, ...employeeBirthdays.map(b => ({
+    ...b,
+    description: null,
+    time: null,
+    end_time: null,
+    location: null,
+    department: null,
+    participants: [],
+    created_by: null,
+    created_by_name: null,
+    status: 'scheduled' as const,
+    recurrence: null,
+    notes: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }))];
+
+  // Filter birthdays for the week
+  const upcomingBirthdays = allActivities.filter(a => 
+    a.type === 'birthday' && isThisWeek(parseISO(a.date))
   );
 
-  // Filtrar actividades
-  const filteredActivities = activities.filter(a => {
+  // Filter activities
+  const filteredActivities = allActivities.filter(a => {
     if (filterType === 'all') return a.type !== 'birthday';
     return a.type === filterType;
   });
 
-  // Agrupar por fecha
+  // Group by date
   const todayActivities = filteredActivities.filter(a => isToday(parseISO(a.date)));
   const tomorrowActivities = filteredActivities.filter(a => isTomorrow(parseISO(a.date)));
   const weekActivities = filteredActivities.filter(a => {
@@ -86,20 +114,18 @@ export default function AgendaPage() {
     return isThisWeek(date) && !isToday(date) && !isTomorrow(date);
   });
 
-  const handleCreateActivity = () => {
-    if (!newActivity.title || !newActivity.date) {
-      toast.error('Completa los campos requeridos');
-      return;
-    }
+  const handleCreateActivity = async () => {
+    if (!newActivity.title || !newActivity.date) return;
 
-    const activity: Activity = {
-      id: `act-${Date.now()}`,
-      ...newActivity,
-      createdBy: 'Usuario',
-      status: 'pending',
-    };
+    await createActivity({
+      title: newActivity.title,
+      description: newActivity.description || undefined,
+      date: newActivity.date,
+      time: newActivity.time || undefined,
+      type: newActivity.type,
+      priority: newActivity.priority,
+    });
 
-    setActivities([activity, ...activities]);
     setIsNewActivityOpen(false);
     setNewActivity({
       title: '',
@@ -107,14 +133,11 @@ export default function AgendaPage() {
       date: '',
       time: '',
       type: 'meeting',
-      priority: 'media',
+      priority: 'medium',
     });
-    toast.success('Actividad creada correctamente');
   };
 
-  const ActivityCard = ({ activity }: { activity: Activity }) => {
-    const daysUntil = differenceInDays(parseISO(activity.date), new Date());
-    
+  const ActivityCard = ({ activity }: { activity: typeof allActivities[0] }) => {
     return (
       <div className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border hover:shadow-md transition-shadow">
         <div className={`p-2 rounded-lg ${getActivityColor(activity.type)}`}>
@@ -125,15 +148,17 @@ export default function AgendaPage() {
             <h4 className="font-medium text-foreground">{activity.title}</h4>
             {activity.priority && (
               <Badge variant="outline" className={
-                activity.priority === 'alta' ? 'border-destructive/30 text-destructive' :
-                activity.priority === 'media' ? 'border-warning/30 text-warning' :
+                activity.priority === 'high' ? 'border-destructive/30 text-destructive' :
+                activity.priority === 'medium' ? 'border-warning/30 text-warning' :
                 'border-muted text-muted-foreground'
               }>
-                {activity.priority}
+                {activity.priority === 'high' ? 'alta' : activity.priority === 'medium' ? 'media' : 'baja'}
               </Badge>
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description}</p>
+          {activity.description && (
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description}</p>
+          )}
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <CalendarIcon className="w-3 h-3" />
@@ -218,6 +243,7 @@ export default function AgendaPage() {
                         <SelectItem value="training">Capacitación</SelectItem>
                         <SelectItem value="event">Evento</SelectItem>
                         <SelectItem value="deadline">Fecha límite</SelectItem>
+                        <SelectItem value="reminder">Recordatorio</SelectItem>
                         <SelectItem value="other">Otro</SelectItem>
                       </SelectContent>
                     </Select>
@@ -229,9 +255,9 @@ export default function AgendaPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="alta">Alta</SelectItem>
-                        <SelectItem value="media">Media</SelectItem>
-                        <SelectItem value="baja">Baja</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                        <SelectItem value="medium">Media</SelectItem>
+                        <SelectItem value="low">Baja</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -297,7 +323,7 @@ export default function AgendaPage() {
                 onSelect={setSelectedDate}
                 className="rounded-md"
                 modifiers={{
-                  hasActivity: activities.map(a => parseISO(a.date)),
+                  hasActivity: allActivities.map(a => parseISO(a.date)),
                 }}
                 modifiersStyles={{
                   hasActivity: { 
@@ -332,49 +358,57 @@ export default function AgendaPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="today">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="today">
-                    Hoy <Badge variant="secondary" className="ml-1">{todayActivities.length}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="tomorrow">
-                    Mañana <Badge variant="secondary" className="ml-1">{tomorrowActivities.length}</Badge>
-                  </TabsTrigger>
-                  <TabsTrigger value="week">
-                    Esta Semana <Badge variant="secondary" className="ml-1">{weekActivities.length}</Badge>
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="today" className="mt-4 space-y-3">
-                  {todayActivities.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No hay actividades para hoy</p>
-                  ) : (
-                    todayActivities.map(activity => (
-                      <ActivityCard key={activity.id} activity={activity} />
-                    ))
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="tomorrow" className="mt-4 space-y-3">
-                  {tomorrowActivities.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No hay actividades para mañana</p>
-                  ) : (
-                    tomorrowActivities.map(activity => (
-                      <ActivityCard key={activity.id} activity={activity} />
-                    ))
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="week" className="mt-4 space-y-3">
-                  {weekActivities.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No hay más actividades esta semana</p>
-                  ) : (
-                    weekActivities.map(activity => (
-                      <ActivityCard key={activity.id} activity={activity} />
-                    ))
-                  )}
-                </TabsContent>
-              </Tabs>
+              {loading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <Tabs defaultValue="today">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="today">
+                      Hoy <Badge variant="secondary" className="ml-1">{todayActivities.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="tomorrow">
+                      Mañana <Badge variant="secondary" className="ml-1">{tomorrowActivities.length}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="week">
+                      Esta Semana <Badge variant="secondary" className="ml-1">{weekActivities.length}</Badge>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="today" className="mt-4 space-y-3">
+                    {todayActivities.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No hay actividades para hoy</p>
+                    ) : (
+                      todayActivities.map(activity => (
+                        <ActivityCard key={activity.id} activity={activity} />
+                      ))
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="tomorrow" className="mt-4 space-y-3">
+                    {tomorrowActivities.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No hay actividades para mañana</p>
+                    ) : (
+                      tomorrowActivities.map(activity => (
+                        <ActivityCard key={activity.id} activity={activity} />
+                      ))
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="week" className="mt-4 space-y-3">
+                    {weekActivities.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No hay más actividades esta semana</p>
+                    ) : (
+                      weekActivities.map(activity => (
+                        <ActivityCard key={activity.id} activity={activity} />
+                      ))
+                    )}
+                  </TabsContent>
+                </Tabs>
+              )}
             </CardContent>
           </Card>
         </div>
