@@ -59,3 +59,50 @@ export interface BiometricUploadResult {
   estimatedDeduction: number;
   records: BiometricRecord[];
 }
+
+// Parsed statistical biometric report (from Excel Página 2)
+export interface BiometricStatRecord {
+  employeeId: string | null;
+  employeeName: string;
+  documentId: string;
+  department: string;
+  scheduledHours: number; // in minutes
+  actualHours: number; // in minutes
+  tardyCount: number;
+  tardyMinutes: number;
+  earlyLeaveCount: number;
+  earlyLeaveMinutes: number;
+  overtimeWeekday: number; // in minutes
+  overtimeHoliday: number; // in minutes
+  daysScheduled: number;
+  daysAttended: number;
+  earlyLeaveDays: number;
+  absences: number;
+  permissions: number;
+  isMatched: boolean; // if found in employees table
+}
+
+export interface ParsedBiometricReport {
+  period: {
+    start: string;
+    end: string;
+  };
+  totalEmployees: number;
+  matchedEmployees: number;
+  unmatchedEmployees: number;
+  records: BiometricStatRecord[];
+  summary: {
+    totalTardyMinutes: number;
+    totalAbsences: number;
+    totalEarlyLeaveMinutes: number;
+    totalOvertimeMinutes: number;
+  };
+}
+
+export interface DuplicateCheckResult {
+  hasDuplicates: boolean;
+  existingCount: number;
+  existingDates: string[];
+}
+
+export type UploadConflictAction = 'overwrite' | 'skip' | 'cancel';
