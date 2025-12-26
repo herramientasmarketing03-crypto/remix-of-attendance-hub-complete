@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance_records: {
+        Row: {
+          absences: number | null
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string
+          days_attended: number | null
+          employee_id: string
+          id: string
+          notes: string | null
+          overtime_holiday: number | null
+          overtime_weekday: number | null
+          status: string | null
+          tardy_count: number | null
+          tardy_minutes: number | null
+          updated_at: string | null
+          worked_hours: number | null
+        }
+        Insert: {
+          absences?: number | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date: string
+          days_attended?: number | null
+          employee_id: string
+          id?: string
+          notes?: string | null
+          overtime_holiday?: number | null
+          overtime_weekday?: number | null
+          status?: string | null
+          tardy_count?: number | null
+          tardy_minutes?: number | null
+          updated_at?: string | null
+          worked_hours?: number | null
+        }
+        Update: {
+          absences?: number | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          days_attended?: number | null
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          overtime_holiday?: number | null
+          overtime_weekday?: number | null
+          status?: string | null
+          tardy_count?: number | null
+          tardy_minutes?: number | null
+          updated_at?: string | null
+          worked_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           created_at: string | null
@@ -257,6 +322,59 @@ export type Database = {
           to_user_type?: string
         }
         Relationships: []
+      }
+      performance_evaluations: {
+        Row: {
+          bonus_condition: string | null
+          classification: string
+          created_at: string | null
+          employee_id: string
+          evaluated_at: string | null
+          evaluated_by: string | null
+          id: string
+          kpis: Json | null
+          observations: string | null
+          overall_score: number | null
+          period: string
+          updated_at: string | null
+        }
+        Insert: {
+          bonus_condition?: string | null
+          classification: string
+          created_at?: string | null
+          employee_id: string
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          id?: string
+          kpis?: Json | null
+          observations?: string | null
+          overall_score?: number | null
+          period: string
+          updated_at?: string | null
+        }
+        Update: {
+          bonus_condition?: string | null
+          classification?: string
+          created_at?: string | null
+          employee_id?: string
+          evaluated_at?: string | null
+          evaluated_by?: string | null
+          id?: string
+          kpis?: Json | null
+          observations?: string | null
+          overall_score?: number | null
+          period?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_evaluations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       permission_requests: {
         Row: {
