@@ -7,22 +7,22 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion } from 'framer-motion';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Shield, 
   Search, 
   Download,
-  Filter,
   RefreshCw,
   FileText,
   User,
   Calendar,
   Clock
 } from 'lucide-react';
-import { getAuditLogs, AuditLogEntry, AuditAction, AuditEntity } from '@/services/auditLog';
+import { useAuditLogs } from '@/hooks/useAuditLogs';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const ACTION_LABELS: Record<AuditAction, { label: string; className: string }> = {
+const ACTION_LABELS: Record<string, { label: string; className: string }> = {
   CREATE: { label: 'Crear', className: 'bg-success/10 text-success' },
   UPDATE: { label: 'Actualizar', className: 'bg-info/10 text-info' },
   DELETE: { label: 'Eliminar', className: 'bg-destructive/10 text-destructive' },
@@ -35,7 +35,7 @@ const ACTION_LABELS: Record<AuditAction, { label: string; className: string }> =
   VIEW: { label: 'Visualización', className: 'bg-muted text-muted-foreground' },
 };
 
-const ENTITY_LABELS: Record<AuditEntity, string> = {
+const ENTITY_LABELS: Record<string, string> = {
   employee: 'Empleado',
   contract: 'Contrato',
   sanction: 'Sanción',
@@ -48,54 +48,45 @@ const ENTITY_LABELS: Record<AuditEntity, string> = {
   task: 'Tarea',
   user: 'Usuario',
   message: 'Mensaje',
+  applicant: 'Postulante',
+  termination: 'Retiro',
+  inventory: 'Inventario',
+  requirement: 'Requerimiento',
+  activity: 'Actividad',
+  settings: 'Configuración',
 };
 
 export default function AuditLogPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const { logs, loading, fetchLogs } = useAuditLogs();
   const [search, setSearch] = useState('');
   const [filterAction, setFilterAction] = useState<string>('all');
   const [filterEntity, setFilterEntity] = useState<string>('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const loadLogs = () => {
-    const filters: Parameters<typeof getAuditLogs>[0] = {};
-    
-    if (filterAction !== 'all') {
-      filters.action = filterAction as AuditAction;
-    }
-    if (filterEntity !== 'all') {
-      filters.entity = filterEntity as AuditEntity;
-    }
-    if (startDate) {
-      filters.startDate = startDate;
-    }
-    if (endDate) {
-      filters.endDate = endDate;
-    }
-
-    const result = getAuditLogs(filters);
-    setLogs(result);
-  };
-
   useEffect(() => {
-    loadLogs();
+    const filters: any = {};
+    if (filterAction !== 'all') filters.action = filterAction;
+    if (filterEntity !== 'all') filters.entity = filterEntity;
+    if (startDate) filters.startDate = startDate;
+    if (endDate) filters.endDate = endDate;
+    fetchLogs(filters);
   }, [filterAction, filterEntity, startDate, endDate]);
 
   const filteredLogs = logs.filter(log => 
-    log.details.toLowerCase().includes(search.toLowerCase()) ||
-    log.userName.toLowerCase().includes(search.toLowerCase())
+    (log.details?.toLowerCase().includes(search.toLowerCase()) || false) ||
+    log.user_name.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleExport = () => {
     const csv = [
       ['Fecha', 'Usuario', 'Acción', 'Entidad', 'Detalle'].join(','),
       ...filteredLogs.map(log => [
-        format(parseISO(log.timestamp), 'yyyy-MM-dd HH:mm:ss'),
-        log.userName,
-        ACTION_LABELS[log.action].label,
-        ENTITY_LABELS[log.entity],
-        `"${log.details}"`
+        format(parseISO(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
+        log.user_name,
+        ACTION_LABELS[log.action]?.label || log.action,
+        ENTITY_LABELS[log.entity] || log.entity,
+        `"${log.details || ''}"`
       ].join(','))
     ].join('\n');
 
@@ -106,6 +97,12 @@ export default function AuditLogPage() {
     a.download = `audit-log-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
   };
+
+  const todayLogs = logs.filter(l => {
+    const logDate = new Date(l.created_at);
+    const today = new Date();
+    return logDate.toDateString() === today.toDateString();
+  });
 
   return (
     <MainLayout>
@@ -126,7 +123,7 @@ export default function AuditLogPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={loadLogs}>
+            <Button variant="outline" onClick={() => fetchLogs()}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Actualizar
             </Button>
@@ -146,7 +143,9 @@ export default function AuditLogPage() {
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{logs.length}</p>
+                  {loading ? <Skeleton className="h-8 w-16" /> : (
+                    <p className="text-2xl font-bold">{logs.length}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">Total registros</p>
                 </div>
               </div>
@@ -159,7 +158,9 @@ export default function AuditLogPage() {
                   <User className="w-5 h-5 text-success" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{new Set(logs.map(l => l.userId)).size}</p>
+                  {loading ? <Skeleton className="h-8 w-16" /> : (
+                    <p className="text-2xl font-bold">{new Set(logs.map(l => l.user_id)).size}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">Usuarios activos</p>
                 </div>
               </div>
@@ -172,13 +173,9 @@ export default function AuditLogPage() {
                   <Calendar className="w-5 h-5 text-info" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    {logs.filter(l => {
-                      const logDate = new Date(l.timestamp);
-                      const today = new Date();
-                      return logDate.toDateString() === today.toDateString();
-                    }).length}
-                  </p>
+                  {loading ? <Skeleton className="h-8 w-16" /> : (
+                    <p className="text-2xl font-bold">{todayLogs.length}</p>
+                  )}
                   <p className="text-sm text-muted-foreground">Acciones hoy</p>
                 </div>
               </div>
@@ -191,9 +188,11 @@ export default function AuditLogPage() {
                   <Clock className="w-5 h-5 text-warning" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">
-                    {logs[0] ? format(parseISO(logs[0].timestamp), 'HH:mm') : '-'}
-                  </p>
+                  {loading ? <Skeleton className="h-8 w-16" /> : (
+                    <p className="text-2xl font-bold">
+                      {logs[0] ? format(parseISO(logs[0].created_at), 'HH:mm') : '-'}
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">Última acción</p>
                 </div>
               </div>
@@ -269,7 +268,17 @@ export default function AuditLogPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredLogs.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         No hay registros que mostrar
@@ -285,23 +294,23 @@ export default function AuditLogPage() {
                         className="hover:bg-muted/30"
                       >
                         <TableCell className="font-mono text-sm">
-                          {format(parseISO(log.timestamp), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
+                          {format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm:ss', { locale: es })}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                               <User className="w-4 h-4 text-primary" />
                             </div>
-                            <span className="font-medium">{log.userName}</span>
+                            <span className="font-medium">{log.user_name}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge className={ACTION_LABELS[log.action].className}>
-                            {ACTION_LABELS[log.action].label}
+                          <Badge className={ACTION_LABELS[log.action]?.className || 'bg-muted'}>
+                            {ACTION_LABELS[log.action]?.label || log.action}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{ENTITY_LABELS[log.entity]}</Badge>
+                          <Badge variant="outline">{ENTITY_LABELS[log.entity] || log.entity}</Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {log.details}
