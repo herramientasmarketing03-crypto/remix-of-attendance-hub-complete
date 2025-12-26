@@ -14,16 +14,534 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      contracts: {
+        Row: {
+          created_at: string | null
+          department: string | null
+          documents_complete: boolean | null
+          employee_id: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          position: string | null
+          salary: number | null
+          start_date: string
+          status: string | null
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          department?: string | null
+          documents_complete?: boolean | null
+          employee_id: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          position?: string | null
+          salary?: number | null
+          start_date: string
+          status?: string | null
+          type: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          department?: string | null
+          documents_complete?: boolean | null
+          employee_id?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          position?: string | null
+          salary?: number | null
+          start_date?: string
+          status?: string | null
+          type?: Database["public"]["Enums"]["contract_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          avatar_url: string | null
+          contract_end_date: string | null
+          contract_type: Database["public"]["Enums"]["contract_type"] | null
+          created_at: string | null
+          department: string
+          document_id: string
+          email: string | null
+          hire_date: string | null
+          id: string
+          name: string
+          phone: string | null
+          position: string | null
+          status: Database["public"]["Enums"]["employee_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          contract_end_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          department: string
+          document_id: string
+          email?: string | null
+          hire_date?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          position?: string | null
+          status?: Database["public"]["Enums"]["employee_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          contract_end_date?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          department?: string
+          document_id?: string
+          email?: string | null
+          hire_date?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          position?: string | null
+          status?: Database["public"]["Enums"]["employee_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      justifications: {
+        Row: {
+          created_at: string | null
+          date: string
+          dcts_validated: boolean | null
+          dcts_validated_at: string | null
+          dcts_validated_by: string | null
+          description: string
+          employee_id: string
+          employee_name: string
+          evidence_type: string | null
+          evidence_url: string | null
+          id: string
+          jefe_approved: boolean | null
+          jefe_approved_at: string | null
+          jefe_approved_by: string | null
+          rrhh_approved: boolean | null
+          rrhh_approved_at: string | null
+          rrhh_approved_by: string | null
+          status: Database["public"]["Enums"]["request_status"] | null
+          type: Database["public"]["Enums"]["justification_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          dcts_validated?: boolean | null
+          dcts_validated_at?: string | null
+          dcts_validated_by?: string | null
+          description: string
+          employee_id: string
+          employee_name: string
+          evidence_type?: string | null
+          evidence_url?: string | null
+          id?: string
+          jefe_approved?: boolean | null
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          rrhh_approved?: boolean | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          status?: Database["public"]["Enums"]["request_status"] | null
+          type: Database["public"]["Enums"]["justification_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          dcts_validated?: boolean | null
+          dcts_validated_at?: string | null
+          dcts_validated_by?: string | null
+          description?: string
+          employee_id?: string
+          employee_name?: string
+          evidence_type?: string | null
+          evidence_url?: string | null
+          id?: string
+          jefe_approved?: boolean | null
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          rrhh_approved?: boolean | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          status?: Database["public"]["Enums"]["request_status"] | null
+          type?: Database["public"]["Enums"]["justification_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "justifications_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          attachment_name: string | null
+          attachment_url: string | null
+          category: string | null
+          created_at: string | null
+          department: string | null
+          from_user_id: string
+          from_user_name: string
+          id: string
+          message: string
+          read_at: string | null
+          replied: boolean | null
+          resolved: boolean | null
+          subject: string
+          to_user_id: string | null
+          to_user_name: string
+          to_user_type: string
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          from_user_id: string
+          from_user_name: string
+          id?: string
+          message: string
+          read_at?: string | null
+          replied?: boolean | null
+          resolved?: boolean | null
+          subject: string
+          to_user_id?: string | null
+          to_user_name: string
+          to_user_type: string
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          category?: string | null
+          created_at?: string | null
+          department?: string | null
+          from_user_id?: string
+          from_user_name?: string
+          id?: string
+          message?: string
+          read_at?: string | null
+          replied?: boolean | null
+          resolved?: boolean | null
+          subject?: string
+          to_user_id?: string | null
+          to_user_name?: string
+          to_user_type?: string
+        }
+        Relationships: []
+      }
+      permission_requests: {
+        Row: {
+          approval_flow: Database["public"]["Enums"]["approval_flow"] | null
+          created_at: string | null
+          date: string
+          employee_id: string
+          end_time: string | null
+          evidence_url: string | null
+          id: string
+          jefe_approved_at: string | null
+          jefe_approved_by: string | null
+          reason: string | null
+          rrhh_approved_at: string | null
+          rrhh_approved_by: string | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["request_status"] | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          approval_flow?: Database["public"]["Enums"]["approval_flow"] | null
+          created_at?: string | null
+          date: string
+          employee_id: string
+          end_time?: string | null
+          evidence_url?: string | null
+          id?: string
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          reason?: string | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["request_status"] | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          approval_flow?: Database["public"]["Enums"]["approval_flow"] | null
+          created_at?: string | null
+          date?: string
+          employee_id?: string
+          end_time?: string | null
+          evidence_url?: string | null
+          id?: string
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          reason?: string | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["request_status"] | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          apellidos: string
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          nombres: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          apellidos: string
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nombres: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          apellidos?: string
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nombres?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sanctions: {
+        Row: {
+          applied_by: string | null
+          created_at: string | null
+          date: string
+          days_of_suspension: number | null
+          description: string
+          employee_id: string
+          evidence_url: string | null
+          id: string
+          infraction_level: string
+          notes: string | null
+          regulation_article: string | null
+          status: string | null
+          type: Database["public"]["Enums"]["sanction_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          applied_by?: string | null
+          created_at?: string | null
+          date: string
+          days_of_suspension?: number | null
+          description: string
+          employee_id: string
+          evidence_url?: string | null
+          id?: string
+          infraction_level: string
+          notes?: string | null
+          regulation_article?: string | null
+          status?: string | null
+          type: Database["public"]["Enums"]["sanction_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          applied_by?: string | null
+          created_at?: string | null
+          date?: string
+          days_of_suspension?: number | null
+          description?: string
+          employee_id?: string
+          evidence_url?: string | null
+          id?: string
+          infraction_level?: string
+          notes?: string | null
+          regulation_article?: string | null
+          status?: string | null
+          type?: Database["public"]["Enums"]["sanction_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sanctions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          area_id: string | null
+          created_at: string | null
+          employee_id: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          area_id?: string | null
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          area_id?: string | null
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      vacation_requests: {
+        Row: {
+          approval_flow: Database["public"]["Enums"]["approval_flow"] | null
+          created_at: string | null
+          days: number
+          employee_id: string
+          end_date: string
+          id: string
+          jefe_approved_at: string | null
+          jefe_approved_by: string | null
+          reason: string | null
+          rrhh_approved_at: string | null
+          rrhh_approved_by: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["request_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          approval_flow?: Database["public"]["Enums"]["approval_flow"] | null
+          created_at?: string | null
+          days: number
+          employee_id: string
+          end_date: string
+          id?: string
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          reason?: string | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["request_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          approval_flow?: Database["public"]["Enums"]["approval_flow"] | null
+          created_at?: string | null
+          days?: number
+          employee_id?: string
+          end_date?: string
+          id?: string
+          jefe_approved_at?: string | null
+          jefe_approved_by?: string | null
+          reason?: string | null
+          rrhh_approved_at?: string | null
+          rrhh_approved_by?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["request_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_area: { Args: { _user_id: string }; Returns: string }
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin_rrhh" | "jefe_area" | "empleado"
+      approval_flow:
+        | "pending"
+        | "jefe_approved"
+        | "rrhh_approved"
+        | "completed"
+        | "rejected"
+      contract_type:
+        | "indefinido"
+        | "plazo_fijo"
+        | "por_obra"
+        | "honorarios"
+        | "practica"
+      employee_status: "active" | "inactive" | "on_leave" | "terminated"
+      justification_type:
+        | "tardanza"
+        | "inasistencia"
+        | "salida_temprana"
+        | "permiso_medico"
+        | "emergencia_familiar"
+      request_status: "pending" | "approved" | "rejected" | "cancelled"
+      sanction_type: "verbal" | "written" | "suspension" | "termination"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +668,32 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin_rrhh", "jefe_area", "empleado"],
+      approval_flow: [
+        "pending",
+        "jefe_approved",
+        "rrhh_approved",
+        "completed",
+        "rejected",
+      ],
+      contract_type: [
+        "indefinido",
+        "plazo_fijo",
+        "por_obra",
+        "honorarios",
+        "practica",
+      ],
+      employee_status: ["active", "inactive", "on_leave", "terminated"],
+      justification_type: [
+        "tardanza",
+        "inasistencia",
+        "salida_temprana",
+        "permiso_medico",
+        "emergencia_familiar",
+      ],
+      request_status: ["pending", "approved", "rejected", "cancelled"],
+      sanction_type: ["verbal", "written", "suspension", "termination"],
+    },
   },
 } as const
