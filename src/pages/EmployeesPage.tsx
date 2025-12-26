@@ -4,6 +4,7 @@ import { UserPlus, Download, FileCheck, Search, Plus, AlertTriangle, DollarSign,
 import { MainLayout } from '@/components/layout/MainLayout';
 import { EmployeeTable } from '@/components/employees/EmployeeTable';
 import { EmployeeDetailDialog } from '@/components/employees/EmployeeDetailDialog';
+import { NewEmployeeForm } from '@/components/employees/NewEmployeeForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { mockEmployees, mockContracts, CONTRACT_TYPES } from '@/data/mockData';
@@ -23,6 +24,7 @@ const EmployeesPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('employees');
+  const [newEmployeeOpen, setNewEmployeeOpen] = useState(false);
   
   // Contract states
   const [search, setSearch] = useState('');
@@ -44,6 +46,12 @@ const EmployeesPage = () => {
   const handleEmployeeUpdate = (updatedEmployee: Employee) => {
     setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
     setSelectedEmployee(updatedEmployee);
+  };
+
+  const handleCreateEmployee = (newEmployee: Employee) => {
+    setEmployees(prev => [newEmployee, ...prev]);
+    setNewEmployeeOpen(false);
+    toast.success(`Empleado ${newEmployee.name} creado correctamente`);
   };
 
   const handleCreateContract = () => {
@@ -121,7 +129,20 @@ const EmployeesPage = () => {
           <div className="flex gap-2">
             <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
             {activeTab === 'employees' ? (
-              <Button className="gradient-primary"><UserPlus className="w-4 h-4 mr-2" />Nuevo Empleado</Button>
+              <Dialog open={newEmployeeOpen} onOpenChange={setNewEmployeeOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-primary"><UserPlus className="w-4 h-4 mr-2" />Nuevo Empleado</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Crear Nuevo Empleado</DialogTitle>
+                  </DialogHeader>
+                  <NewEmployeeForm 
+                    onSubmit={handleCreateEmployee} 
+                    onCancel={() => setNewEmployeeOpen(false)} 
+                  />
+                </DialogContent>
+              </Dialog>
             ) : (
               <Dialog open={newContractOpen} onOpenChange={setNewContractOpen}>
                 <DialogTrigger asChild>
