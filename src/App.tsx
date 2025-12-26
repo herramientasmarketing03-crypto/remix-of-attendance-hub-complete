@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import EmployeesPage from "./pages/EmployeesPage";
@@ -42,7 +43,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <SettingsProvider>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/virtual-attendance" element={<ProtectedRoute allowedRoles={['jefe_area', 'empleado']}><VirtualAttendancePage /></ProtectedRoute>} />
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/audit-log" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><AuditLogPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </SettingsProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
