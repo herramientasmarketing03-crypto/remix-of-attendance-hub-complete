@@ -15,8 +15,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 
 export function Header() {
-  const { user, signOut } = useAuth();
-  const initials = user ? `${user.nombres?.[0] || ''}${user.apellidos?.[0] || ''}`.toUpperCase() : 'U';
+  const { profile, signOut } = useAuth();
+  const initials = profile ? `${profile.nombres?.[0] || ''}${profile.apellidos?.[0] || ''}`.toUpperCase() : 'U';
 
   return (
     <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-40">
@@ -46,7 +46,7 @@ export function Header() {
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <span className="font-medium">{user?.nombres}</span>
+              <span className="font-medium">{profile?.nombres}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

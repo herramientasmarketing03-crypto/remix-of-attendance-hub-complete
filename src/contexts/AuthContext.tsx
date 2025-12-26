@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { User, Session } from '@supabase/supabase-js';
 
 export type AppRole = 'admin_rrhh' | 'jefe_area' | 'empleado';
 
@@ -9,15 +11,18 @@ interface UserRole {
   employeeId: string | null;
 }
 
-interface User {
+interface Profile {
   id: string;
-  email: string;
+  email: string | null;
   nombres: string;
   apellidos: string;
+  avatar_url: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
+  profile: Profile | null;
   userRole: UserRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -31,68 +36,108 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo users for testing with dynamic linking
-const DEMO_USERS = {
-  'admin@empresa.com': { role: 'admin_rrhh' as AppRole, nombres: 'María', apellidos: 'García', area_id: null, employeeId: null },
-  'jefe@empresa.com': { role: 'jefe_area' as AppRole, nombres: 'Carlos', apellidos: 'Ruiz', area_id: 'ti', employeeId: '6' },
-  'empleado@empresa.com': { role: 'empleado' as AppRole, nombres: 'Christian', apellidos: 'Maldon', area_id: 'ti', employeeId: '4' },
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('attendance_user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [userRole, setUserRole] = useState<UserRole | null>(() => {
-    const savedRole = localStorage.getItem('attendance_role');
-    return savedRole ? JSON.parse(savedRole) : null;
-  });
-  const [loading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Defer fetching profile and role to avoid deadlock
+        if (session?.user) {
+          setTimeout(() => {
+            fetchUserData(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+          setUserRole(null);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserData(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (profileData) {
+        setProfile({
+          id: profileData.id,
+          email: profileData.email,
+          nombres: profileData.nombres,
+          apellidos: profileData.apellidos,
+          avatar_url: profileData.avatar_url,
+        });
+      }
+
+      // Fetch role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (roleData) {
+        setUserRole({
+          role: roleData.role as AppRole,
+          area_id: roleData.area_id,
+          employeeId: roleData.employee_id,
+        });
+      } else {
+        // Default to empleado if no role found
+        setUserRole({
+          role: 'empleado',
+          area_id: null,
+          employeeId: null,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const demoUser = DEMO_USERS[email as keyof typeof DEMO_USERS];
-      
-      if (demoUser && password === 'demo123') {
-        const newUser = {
-          id: email,
-          email,
-          nombres: demoUser.nombres,
-          apellidos: demoUser.apellidos,
-        };
-        const newRole = { role: demoUser.role, area_id: demoUser.area_id, employeeId: demoUser.employeeId };
-        
-        setUser(newUser);
-        setUserRole(newRole);
-        localStorage.setItem('attendance_user', JSON.stringify(newUser));
-        localStorage.setItem('attendance_role', JSON.stringify(newRole));
-        
-        toast.success('Sesión iniciada correctamente');
-        return { error: null };
-      }
-      
-      // For demo purposes, accept any email with password 'demo123'
-      if (password === 'demo123') {
-        const newUser = {
-          id: email,
-          email,
-          nombres: 'Usuario',
-          apellidos: 'Demo',
-        };
-        const newRole = { role: 'empleado' as AppRole, area_id: null, employeeId: null };
-        
-        setUser(newUser);
-        setUserRole(newRole);
-        localStorage.setItem('attendance_user', JSON.stringify(newUser));
-        localStorage.setItem('attendance_role', JSON.stringify(newRole));
-        
-        toast.success('Sesión iniciada correctamente');
-        return { error: null };
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return { error };
       }
 
-      const error = new Error('Credenciales inválidas');
-      toast.error('Credenciales inválidas');
-      return { error };
+      toast.success('Sesión iniciada correctamente');
+      return { error: null };
     } catch (error) {
       const err = error as Error;
       toast.error(err.message);
@@ -102,20 +147,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, nombres: string, apellidos: string) => {
     try {
-      const newUser = {
-        id: email,
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
         email,
-        nombres,
-        apellidos,
-      };
-      const newRole = { role: 'empleado' as AppRole, area_id: null, employeeId: null };
-      
-      setUser(newUser);
-      setUserRole(newRole);
-      localStorage.setItem('attendance_user', JSON.stringify(newUser));
-      localStorage.setItem('attendance_role', JSON.stringify(newRole));
-      
-      toast.success('Cuenta creada correctamente');
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            nombres,
+            apellidos,
+          },
+        },
+      });
+
+      if (error) {
+        toast.error(error.message);
+        return { error };
+      }
+
+      toast.success('Cuenta creada correctamente. ¡Bienvenido!');
       return { error: null };
     } catch (error) {
       const err = error as Error;
@@ -125,10 +176,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
+    setProfile(null);
     setUserRole(null);
-    localStorage.removeItem('attendance_user');
-    localStorage.removeItem('attendance_role');
     toast.success('Sesión cerrada');
   };
 
@@ -138,6 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value: AuthContextType = {
     user,
+    session,
+    profile,
     userRole,
     loading,
     signIn,
