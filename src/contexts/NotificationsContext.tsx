@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { mockContracts, mockEmployees, mockSanctions } from '@/data/mockData';
-import { getContractAlerts } from '@/services/contractAlerts';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export type NotificationType = 
   | 'contract_expiring'
@@ -11,6 +11,7 @@ export type NotificationType =
   | 'vacation_request'
   | 'evaluation_pending'
   | 'attendance_issue'
+  | 'message'
   | 'general';
 
 export interface Notification {
@@ -31,140 +32,199 @@ interface NotificationsContextType {
   markAllAsRead: () => void;
   clearNotification: (id: string) => void;
   refreshNotifications: () => void;
+  createNotification: (targetUserId: string, notification: {
+    type: string;
+    title: string;
+    message: string;
+    link?: string;
+    priority?: string;
+  }) => Promise<boolean>;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const { userRole, isAdmin, isJefe, user } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const generateNotifications = useCallback(() => {
-    const newNotifications: Notification[] = [];
-
-    // Admin/RRHH notifications
-    if (isAdmin) {
-      // Contract alerts
-      const contractAlerts = getContractAlerts(mockContracts);
-      contractAlerts.forEach(alert => {
-        const employee = mockEmployees.find(e => e.id === alert.contract.employeeId);
-        newNotifications.push({
-          id: `contract-${alert.contract.id}`,
-          type: 'contract_expiring',
-          title: 'Contrato próximo a vencer',
-          message: `${employee?.name} - ${alert.message}`,
-          link: '/contracts',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-          priority: alert.level === 'critical' ? 'high' : alert.level === 'warning' ? 'medium' : 'low'
-        });
-      });
-
-      // Pending sanctions
-      const pendingSanctions = mockSanctions.filter(s => s.status === 'active');
-      if (pendingSanctions.length > 0) {
-        newNotifications.push({
-          id: 'sanctions-pending',
-          type: 'sanction_pending',
-          title: 'Sanciones activas',
-          message: `${pendingSanctions.length} sanciones activas requieren seguimiento`,
-          link: '/sanctions',
-          isRead: false,
-          createdAt: new Date().toISOString(),
-          priority: 'medium'
-        });
-      }
-
-      // Sample justification pending
-      newNotifications.push({
-        id: 'justification-1',
-        type: 'justification_pending',
-        title: 'Justificación pendiente',
-        message: '3 justificaciones pendientes de revisión',
-        link: '/justifications',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        priority: 'medium'
-      });
+  const fetchNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      setLoading(false);
+      return;
     }
 
-    // Jefe notifications
-    if (isJefe) {
-      newNotifications.push({
-        id: 'team-attendance',
-        type: 'attendance_issue',
-        title: 'Tardanzas del equipo',
-        message: '2 empleados con tardanzas hoy',
-        link: '/attendance',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        priority: 'medium'
-      });
+    try {
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      newNotifications.push({
-        id: 'tasks-due',
-        type: 'task_due',
-        title: 'Tareas vencidas',
-        message: '3 tareas del equipo vencen hoy',
-        link: '/task-tracker',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        priority: 'high'
-      });
+      if (error) throw error;
+      
+      const mappedNotifications: Notification[] = (data || []).map(n => ({
+        id: n.id,
+        type: n.type as NotificationType,
+        title: n.title,
+        message: n.message,
+        link: n.link || undefined,
+        isRead: n.is_read,
+        createdAt: n.created_at,
+        priority: (n.priority || 'medium') as 'low' | 'medium' | 'high',
+      }));
+      
+      setNotifications(mappedNotifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
     }
-
-    // Employee notifications
-    if (userRole?.role === 'empleado') {
-      newNotifications.push({
-        id: 'my-tasks',
-        type: 'task_due',
-        title: 'Tarea asignada',
-        message: 'Tienes 2 tareas pendientes',
-        link: '/task-tracker',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        priority: 'medium'
-      });
-    }
-
-    // Add a general notification for everyone
-    newNotifications.push({
-      id: 'general-1',
-      type: 'general',
-      title: 'Mensaje del sistema',
-      message: 'Bienvenido al sistema de gestión de RRHH',
-      isRead: true,
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      priority: 'low'
-    });
-
-    setNotifications(newNotifications);
-  }, [isAdmin, isJefe, userRole]);
+  }, [user]);
 
   useEffect(() => {
-    if (user) {
-      generateNotifications();
-    } else {
-      setNotifications([]);
-    }
-  }, [user, generateNotifications]);
+    fetchNotifications();
 
-  const markAsRead = (id: string) => {
+    // Subscribe to realtime updates
+    if (user) {
+      const channel = supabase
+        .channel('notifications-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              const newNotif = payload.new as any;
+              const mapped: Notification = {
+                id: newNotif.id,
+                type: newNotif.type as NotificationType,
+                title: newNotif.title,
+                message: newNotif.message,
+                link: newNotif.link || undefined,
+                isRead: newNotif.is_read,
+                createdAt: newNotif.created_at,
+                priority: (newNotif.priority || 'medium') as 'low' | 'medium' | 'high',
+              };
+              setNotifications((prev) => [mapped, ...prev]);
+              
+              // Show toast for new notifications
+              toast.info(mapped.title, {
+                description: mapped.message,
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              const updated = payload.new as any;
+              setNotifications((prev) =>
+                prev.map((n) =>
+                  n.id === updated.id 
+                    ? { ...n, isRead: updated.is_read } 
+                    : n
+                )
+              );
+            } else if (payload.eventType === 'DELETE') {
+              setNotifications((prev) =>
+                prev.filter((n) => n.id !== (payload.old as any).id)
+              );
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [user, fetchNotifications]);
+
+  const markAsRead = async (id: string) => {
+    // Optimistic update
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, isRead: true } : n)
     );
+
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      // Revert on error
+      fetchNotifications();
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
+    if (!user) return;
+
+    // Optimistic update
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      fetchNotifications();
+    }
   };
 
-  const clearNotification = (id: string) => {
+  const clearNotification = async (id: string) => {
+    // Optimistic update
     setNotifications(prev => prev.filter(n => n.id !== id));
+
+    try {
+      const { error } = await supabase
+        .from('user_notifications')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error clearing notification:', error);
+      fetchNotifications();
+    }
   };
 
-  const refreshNotifications = () => {
-    generateNotifications();
+  const createNotification = async (
+    targetUserId: string,
+    notification: {
+      type: string;
+      title: string;
+      message: string;
+      link?: string;
+      priority?: string;
+    }
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase.from('user_notifications').insert({
+        user_id: targetUserId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        link: notification.link || null,
+        priority: notification.priority || 'medium',
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      return false;
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -176,7 +236,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       markAsRead,
       markAllAsRead,
       clearNotification,
-      refreshNotifications
+      refreshNotifications: fetchNotifications,
+      createNotification,
     }}>
       {children}
     </NotificationsContext.Provider>
