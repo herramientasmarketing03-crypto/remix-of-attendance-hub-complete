@@ -57,7 +57,7 @@ export default function TaskTrackerPage() {
       description: newTask.description,
       assignedTo: newTask.assignedTo,
       assignedToName: responsible?.name || 'Sin asignar',
-      assignedBy: user?.nombres || 'Usuario',
+      assignedBy: profile?.nombres || 'Usuario',
       priorityId: newTask.priorityId,
       statusId: newTask.statusId,
       categoryId: newTask.categoryId,

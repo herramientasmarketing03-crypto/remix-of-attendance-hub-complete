@@ -29,7 +29,7 @@ const infractionLevels: { value: InfractionLevel; label: string }[] = [
 ];
 
 export function SanctionForm({ employee, onSubmit, onCancel }: SanctionFormProps) {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [type, setType] = useState<SanctionType>('verbal_warning');
   const [infractionLevel, setInfractionLevel] = useState<InfractionLevel>('leve');
   const [description, setDescription] = useState('');
@@ -46,7 +46,7 @@ export function SanctionForm({ employee, onSubmit, onCancel }: SanctionFormProps
       description,
       regulationArticle,
       date: new Date().toISOString().split('T')[0],
-      appliedBy: user ? `${user.nombres} ${user.apellidos}` : 'RRHH',
+      appliedBy: profile ? `${profile.nombres} ${profile.apellidos}` : 'RRHH',
       daysOfSuspension: type === 'suspension' ? daysOfSuspension : undefined,
       status: 'active',
     });

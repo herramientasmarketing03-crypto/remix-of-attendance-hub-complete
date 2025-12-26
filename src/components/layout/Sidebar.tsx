@@ -72,7 +72,7 @@ const roleLabels: Record<AppRole, { label: string; color: string }> = {
 };
 
 export function Sidebar() {
-  const { user, userRole, signOut } = useAuth();
+  const { profile, userRole, signOut } = useAuth();
 
   const menuItems = allMenuItems.filter(item => {
     if (!item.roles) return true;
@@ -81,7 +81,7 @@ export function Sidebar() {
   });
 
   const roleInfo = userRole ? roleLabels[userRole.role] : null;
-  const initials = user ? `${user.nombres?.[0] || ''}${user.apellidos?.[0] || ''}`.toUpperCase() : 'U';
+  const initials = profile ? `${profile.nombres?.[0] || ''}${profile.apellidos?.[0] || ''}`.toUpperCase() : 'U';
 
   return (
     <motion.aside 
@@ -112,7 +112,7 @@ export function Sidebar() {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {user?.nombres} {user?.apellidos}
+              {profile?.nombres} {profile?.apellidos}
             </p>
             {roleInfo && (
               <Badge className={cn("text-xs mt-1", roleInfo.color)}>
