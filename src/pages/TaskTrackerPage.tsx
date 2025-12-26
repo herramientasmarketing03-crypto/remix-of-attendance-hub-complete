@@ -26,7 +26,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export default function TaskTrackerPage() {
-  const { isAdmin, isJefe, user } = useAuth();
+  const { isAdmin, isJefe, user, profile } = useAuth();
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [activeTab, setActiveTab] = useState('mi-panel');
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);

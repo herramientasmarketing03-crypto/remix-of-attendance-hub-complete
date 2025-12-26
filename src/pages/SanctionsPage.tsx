@@ -53,7 +53,7 @@ const INFRACTION_LEVEL_LABELS: Record<InfractionLevel, { label: string; classNam
 };
 
 export default function SanctionsPage() {
-  const { isAdmin, isJefe, user, userRole } = useAuth();
+  const { isAdmin, isJefe, user, userRole, profile } = useAuth();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedSanction, setSelectedSanction] = useState<ExtendedSanction | null>(null);
@@ -98,7 +98,7 @@ export default function SanctionsPage() {
     ));
     
     const employee = getEmployee(sanction.employeeId);
-    logAction('APPROVE', 'sanction', sanction.id, user?.id || '', `${user?.nombres} ${user?.apellidos}`, 
+    logAction('APPROVE', 'sanction', sanction.id, user?.id || '', `${profile?.nombres} ${profile?.apellidos}`, 
       `Aprobó sanción para ${employee?.name}`);
     
     toast.success('Sanción aprobada');
@@ -114,7 +114,7 @@ export default function SanctionsPage() {
     ));
     
     const employee = getEmployee(sanction.employeeId);
-    logAction('REJECT', 'sanction', sanction.id, user?.id || '', `${user?.nombres} ${user?.apellidos}`, 
+    logAction('REJECT', 'sanction', sanction.id, user?.id || '', `${profile?.nombres} ${profile?.apellidos}`, 
       `Rechazó sanción para ${employee?.name}`);
     
     toast.success('Sanción rechazada');
