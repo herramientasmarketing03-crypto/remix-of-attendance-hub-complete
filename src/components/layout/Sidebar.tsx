@@ -50,7 +50,7 @@ const allMenuItems: MenuItem[] = [
   { icon: FileText, label: 'Justificaciones', path: '/justifications' },
   { icon: ListTodo, label: 'Tracker Tareas', path: '/task-tracker' },
   { icon: Building2, label: 'Departamentos', path: '/departments', roles: ['admin_rrhh', 'jefe_area'] },
-  { icon: FileCheck, label: 'Contratos', path: '/contracts', roles: ['admin_rrhh', 'jefe_area'] },
+  
   { icon: Wallet, label: 'Boletas de Pago', path: '/payroll' },
   { icon: UserPlus, label: 'Requerimientos', path: '/requirements', roles: ['admin_rrhh', 'jefe_area'] },
   { icon: TrendingUp, label: 'Rendimiento', path: '/performance', roles: ['admin_rrhh', 'jefe_area'] },

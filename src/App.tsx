@@ -12,7 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import EmployeesPage from "./pages/EmployeesPage";
 import AttendancePage from "./pages/AttendancePage";
 import DepartmentsPage from "./pages/DepartmentsPage";
-import ContractsPage from "./pages/ContractsPage";
+
 import RequirementsPage from "./pages/RequirementsPage";
 import RegulationsPage from "./pages/RegulationsPage";
 import MessagesPage from "./pages/MessagesPage";
@@ -56,7 +56,7 @@ const App = () => (
                   <Route path="/payroll" element={<ProtectedRoute><PayrollPage /></ProtectedRoute>} />
                   <Route path="/employees" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><EmployeesPage /></ProtectedRoute>} />
                   <Route path="/departments" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><DepartmentsPage /></ProtectedRoute>} />
-                  <Route path="/contracts" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><ContractsPage /></ProtectedRoute>} />
+                  
                   <Route path="/requirements" element={<ProtectedRoute allowedRoles={['admin_rrhh', 'jefe_area']}><RequirementsPage /></ProtectedRoute>} />
                   <Route path="/upload" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><UploadPage /></ProtectedRoute>} />
                   <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin_rrhh']}><ReportsPage /></ProtectedRoute>} />
