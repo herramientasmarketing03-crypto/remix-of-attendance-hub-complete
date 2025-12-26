@@ -48,6 +48,33 @@ export interface TaskUpdate {
   notes?: string | null;
 }
 
+// Helper function to get employee_id by name or return current user's employee_id
+export async function getEmployeeIdForTask(
+  assignedTo: string,
+  currentUserId: string | undefined
+): Promise<string | null> {
+  if (!currentUserId) return null;
+
+  // If assigned to "YO" or current user, get their employee_id
+  if (assignedTo.toUpperCase() === 'YO') {
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', currentUserId)
+      .maybeSingle();
+    return employee?.id || null;
+  }
+
+  // Search for employee by name
+  const { data: employee } = await supabase
+    .from('employees')
+    .select('id')
+    .ilike('name', `%${assignedTo}%`)
+    .maybeSingle();
+
+  return employee?.id || null;
+}
+
 export function useEmployeeTasks() {
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [loading, setLoading] = useState(true);

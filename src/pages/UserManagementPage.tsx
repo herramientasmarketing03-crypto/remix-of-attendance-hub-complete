@@ -11,8 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, UserCog, Shield, Users, Link2, RefreshCw, Edit, KeyRound } from 'lucide-react';
+import { Search, UserCog, Shield, Users, Link2, RefreshCw, Edit, KeyRound, UserPlus, Loader2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AppRole } from '@/contexts/AuthContext';
 
 interface UserWithRole {
@@ -70,6 +71,8 @@ export default function UserManagementPage() {
   });
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [resettingPassword, setResettingPassword] = useState<string | null>(null);
+  const [creatingAccount, setCreatingAccount] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('users');
 
   useEffect(() => {
     fetchData();
@@ -280,6 +283,42 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleCreateAccount = async (employee: Employee) => {
+    if (!employee.email) {
+      toast.error('El empleado no tiene email registrado');
+      return;
+    }
+
+    setCreatingAccount(employee.id);
+    try {
+      const response = await supabase.functions.invoke('create-employee-user', {
+        body: { employeeId: employee.id, email: employee.email },
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      const { data } = response;
+      if (data?.isExisting) {
+        toast.success('Usuario existente vinculado al empleado');
+      } else {
+        toast.success('Cuenta creada con contraseña temporal: 123456', {
+          description: 'El empleado puede iniciar sesión con su email',
+        });
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error creating account:', error);
+      toast.error('Error al crear la cuenta');
+    } finally {
+      setCreatingAccount(null);
+    }
+  };
+
+  // Employees without user account
+  const employeesWithoutAccount = employees.filter(e => !e.user_id);
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -398,12 +437,25 @@ export default function UserManagementPage() {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Usuarios Registrados</CardTitle>
-            <CardDescription>Lista de usuarios con sus roles y empleados vinculados</CardDescription>
-          </CardHeader>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="users">Usuarios Registrados</TabsTrigger>
+            <TabsTrigger value="pending" className="gap-2">
+              Empleados sin Cuenta
+              {employeesWithoutAccount.length > 0 && (
+                <Badge variant="destructive" className="ml-1">{employeesWithoutAccount.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users">
+            {/* Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Usuarios Registrados</CardTitle>
+                <CardDescription>Lista de usuarios con sus roles y empleados vinculados</CardDescription>
+              </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="relative flex-1">
@@ -549,7 +601,87 @@ export default function UserManagementPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pending">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5" />
+                  Empleados sin Cuenta de Usuario
+                </CardTitle>
+                <CardDescription>
+                  Estos empleados están registrados pero no tienen cuenta para acceder al sistema.
+                  Crear una cuenta les permitirá iniciar sesión y usar las funciones del sistema.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {employeesWithoutAccount.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Todos los empleados tienen cuenta de usuario
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Empleado</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Departamento</TableHead>
+                          <TableHead>Puesto</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {employeesWithoutAccount.map((employee) => (
+                          <TableRow key={employee.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9">
+                                  <AvatarFallback className="bg-warning/10 text-warning text-sm">
+                                    {employee.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium">{employee.name}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {employee.email || <span className="text-destructive text-sm">Sin email</span>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {DEPARTMENTS.find(d => d.value === employee.department)?.label || employee.department}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{employee.position || '-'}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                onClick={() => handleCreateAccount(employee)}
+                                disabled={creatingAccount === employee.id || !employee.email}
+                                title={!employee.email ? 'El empleado necesita un email registrado' : 'Crear cuenta'}
+                              >
+                                {creatingAccount === employee.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                ) : (
+                                  <UserPlus className="w-4 h-4 mr-2" />
+                                )}
+                                Crear Cuenta
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Edit Role Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
