@@ -97,7 +97,8 @@ export function EmployeeTable({ employees, onViewEmployee, onContactEmployee, on
           </TableHeader>
           <TableBody>
             {filteredEmployees.map((employee, index) => {
-              const dept = DEPARTMENTS[employee.department];
+              const dept = DEPARTMENTS[employee.department as Department];
+              const deptName = dept?.name || employee.department || 'Sin asignar';
               return (
                 <motion.tr
                   key={employee.id}
@@ -124,7 +125,7 @@ export function EmployeeTable({ employees, onViewEmployee, onContactEmployee, on
                   <TableCell className="font-mono text-sm">{employee.documentId}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-primary/10 text-primary">
-                      {dept.name}
+                      {deptName}
                     </Badge>
                   </TableCell>
                   <TableCell>{employee.position || '-'}</TableCell>

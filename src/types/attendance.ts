@@ -4,7 +4,9 @@ export type Department =
   | 'marketing'
   | 'campanas'
   | 'ti'
-  | 'digitalcollege';
+  | 'digitalcollege'
+  | 'rrhh'
+  | 'finanzas';
 
 export const DEPARTMENTS: Record<Department, { name: string; color: string; icon: string }> = {
   comercial: { name: 'Comercial', color: 'hsl(217 91% 50%)', icon: 'briefcase' },
@@ -13,6 +15,8 @@ export const DEPARTMENTS: Record<Department, { name: string; color: string; icon
   campanas: { name: 'Campañas', color: 'hsl(38 92% 50%)', icon: 'target' },
   ti: { name: 'TI', color: 'hsl(188 94% 43%)', icon: 'code' },
   digitalcollege: { name: 'Digital College', color: 'hsl(262 83% 58%)', icon: 'graduation-cap' },
+  rrhh: { name: 'RRHH', color: 'hsl(350 89% 60%)', icon: 'users' },
+  finanzas: { name: 'Finanzas', color: 'hsl(45 93% 47%)', icon: 'calculator' },
 };
 
 export interface Employee {
