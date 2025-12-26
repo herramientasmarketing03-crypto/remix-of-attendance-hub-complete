@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useJustifications } from '@/hooks/useJustifications';
+import { useJustifications, type Justification } from '@/hooks/useJustifications';
 import { 
   FileCheck, Search, Plus, CheckCircle, XCircle, Clock, FileText, ShieldCheck, Eye, Upload, Loader2
 } from 'lucide-react';
@@ -24,76 +24,79 @@ const JUSTIFICATION_STATUS: Record<string, { name: string; className: string }> 
   rejected: { name: 'Rechazado', className: 'bg-destructive/10 text-destructive' },
 };
 
+const JUSTIFICATION_TYPE_LABELS: Record<string, string> = {
+  tardanza: 'Tardanza',
+  inasistencia: 'Inasistencia',
+  salida_temprana: 'Salida Temprana',
+  permiso_medico: 'Permiso Médico',
+  emergencia_familiar: 'Emergencia Familiar',
+};
+
 export default function JustificationsPage() {
   const { userRole, profile, user } = useAuth();
-  const { justifications, loading, approveByJefe, approveByRRHH, reject } = useJustifications();
+  const { justifications, loading, approveByJefe, approveByRRHH, reject, refetch } = useJustifications();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedJustification, setSelectedJustification] = useState<typeof justifications[0] | null>(null);
-  const [isNewOpen, setIsNewOpen] = useState(false);
+  const [selectedJustification, setSelectedJustification] = useState<Justification | null>(null);
   const [isNewOpen, setIsNewOpen] = useState(false);
 
   const isAdmin = userRole?.role === 'admin_rrhh';
   const isJefe = userRole?.role === 'jefe_area';
 
   const filteredJustifications = justifications.filter(j => {
-    const matchesSearch = j.employeeName.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = j.employee_name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = filterStatus === 'all' || j.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const pendingCount = justifications.filter(j => j.status === 'pending').length;
-  const jefeApprovedCount = justifications.filter(j => j.status === 'jefe_approved').length;
-  const approvedCount = justifications.filter(j => j.status === 'rrhh_approved').length;
+  const jefeApprovedCount = justifications.filter(j => j.jefe_approved && !j.rrhh_approved).length;
+  const approvedCount = justifications.filter(j => j.status === 'approved').length;
+  const dctsValidatedCount = justifications.filter(j => j.dcts_validated).length;
 
-  const handleApproveJefe = (id: string) => {
-    setJustifications(prev => prev.map(j => 
-      j.id === id ? {
-        ...j,
-        status: 'jefe_approved' as const,
-        approvalFlow: {
-          ...j.approvalFlow,
-          jefeApproval: { approved: true, date: new Date().toISOString(), by: 'Jefe de Área' }
-        }
-      } : j
-    ));
-    toast.success('Justificación aprobada por Jefe');
-    setSelectedJustification(null);
-  };
-
-  const handleApproveRRHH = (id: string) => {
-    setJustifications(prev => prev.map(j => 
-      j.id === id ? {
-        ...j,
-        status: 'rrhh_approved' as const,
-        approvalFlow: {
-          ...j.approvalFlow,
-          rrhhApproval: { approved: true, date: new Date().toISOString(), by: 'RRHH' }
-        }
-      } : j
-    ));
-    toast.success('Justificación aprobada por RRHH');
-    setSelectedJustification(null);
-  };
-
-  const handleReject = (id: string) => {
-    setJustifications(prev => prev.map(j => 
-      j.id === id ? { ...j, status: 'rejected' as const } : j
-    ));
-    toast.info('Justificación rechazada');
-    setSelectedJustification(null);
-  };
-
-  const getTypeLabel = (type: JustificationRequest['type']) => {
-    switch (type) {
-      case 'tardanza': return 'Tardanza';
-      case 'falta': return 'Falta';
-      case 'salida_temprana': return 'Salida Temprana';
-      case 'permiso': return 'Permiso';
-      case 'licencia': return 'Licencia';
-      default: return type;
+  const handleApproveJefe = async (id: string) => {
+    try {
+      await approveByJefe(id, `${profile?.nombres} ${profile?.apellidos}`);
+      toast.success('Justificación aprobada por Jefe');
+      setSelectedJustification(null);
+    } catch (error) {
+      console.error('Error approving:', error);
     }
   };
+
+  const handleApproveRRHH = async (id: string) => {
+    try {
+      await approveByRRHH(id, `${profile?.nombres} ${profile?.apellidos}`);
+      toast.success('Justificación aprobada por RRHH');
+      setSelectedJustification(null);
+    } catch (error) {
+      console.error('Error approving:', error);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      await reject(id);
+      toast.info('Justificación rechazada');
+      setSelectedJustification(null);
+    } catch (error) {
+      console.error('Error rejecting:', error);
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    return JUSTIFICATION_TYPE_LABELS[type] || type;
+  };
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -124,10 +127,10 @@ export default function JustificationsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tardanza">Tardanza</SelectItem>
-                      <SelectItem value="falta">Falta</SelectItem>
+                      <SelectItem value="inasistencia">Inasistencia</SelectItem>
                       <SelectItem value="salida_temprana">Salida Temprana</SelectItem>
-                      <SelectItem value="permiso">Permiso</SelectItem>
-                      <SelectItem value="licencia">Licencia</SelectItem>
+                      <SelectItem value="permiso_medico">Permiso Médico</SelectItem>
+                      <SelectItem value="emergencia_familiar">Emergencia Familiar</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -220,7 +223,7 @@ export default function JustificationsPage() {
                   <ShieldCheck className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{justifications.filter(j => j.dctsValidation?.validated).length}</p>
+                  <p className="text-2xl font-bold">{dctsValidatedCount}</p>
                   <p className="text-sm text-muted-foreground">Validadas DCTS</p>
                 </div>
               </div>
@@ -248,8 +251,7 @@ export default function JustificationsPage() {
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pending">Pendientes</SelectItem>
-                  <SelectItem value="jefe_approved">Aprobado Jefe</SelectItem>
-                  <SelectItem value="rrhh_approved">Aprobado RRHH</SelectItem>
+                  <SelectItem value="approved">Aprobados</SelectItem>
                   <SelectItem value="rejected">Rechazados</SelectItem>
                 </SelectContent>
               </Select>
@@ -275,14 +277,14 @@ export default function JustificationsPage() {
               <TableBody>
                 {filteredJustifications.map((justification) => (
                   <TableRow key={justification.id}>
-                    <TableCell className="font-medium">{justification.employeeName}</TableCell>
+                    <TableCell className="font-medium">{justification.employee_name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{getTypeLabel(justification.type)}</Badge>
                     </TableCell>
                     <TableCell>{format(parseISO(justification.date), 'dd MMM yyyy', { locale: es })}</TableCell>
                     <TableCell className="max-w-xs truncate">{justification.description}</TableCell>
                     <TableCell>
-                      {justification.dctsValidation?.validated ? (
+                      {justification.dcts_validated ? (
                         <Badge className="bg-success/10 text-success gap-1">
                           <ShieldCheck className="w-3 h-3" />
                           Validado
@@ -295,8 +297,8 @@ export default function JustificationsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge className={JUSTIFICATION_STATUS[justification.status].className}>
-                        {JUSTIFICATION_STATUS[justification.status].name}
+                      <Badge className={JUSTIFICATION_STATUS[justification.status || 'pending']?.className}>
+                        {JUSTIFICATION_STATUS[justification.status || 'pending']?.name}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -321,11 +323,11 @@ export default function JustificationsPage() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">{selectedJustification.employeeName}</h3>
+                    <h3 className="text-xl font-semibold">{selectedJustification.employee_name}</h3>
                     <p className="text-muted-foreground">{getTypeLabel(selectedJustification.type)}</p>
                   </div>
-                  <Badge className={JUSTIFICATION_STATUS[selectedJustification.status].className}>
-                    {JUSTIFICATION_STATUS[selectedJustification.status].name}
+                  <Badge className={JUSTIFICATION_STATUS[selectedJustification.status || 'pending']?.className}>
+                    {JUSTIFICATION_STATUS[selectedJustification.status || 'pending']?.name}
                   </Badge>
                 </div>
 
@@ -336,7 +338,7 @@ export default function JustificationsPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-muted-foreground">Fecha de Envío</Label>
-                    <p className="font-medium">{format(parseISO(selectedJustification.submittedAt), 'PPP', { locale: es })}</p>
+                    <p className="font-medium">{format(parseISO(selectedJustification.created_at || new Date().toISOString()), 'PPP', { locale: es })}</p>
                   </div>
                 </div>
 
@@ -345,7 +347,7 @@ export default function JustificationsPage() {
                   <p className="font-medium">{selectedJustification.description}</p>
                 </div>
 
-                {selectedJustification.evidenceUrl && (
+                {selectedJustification.evidence_url && (
                   <div className="space-y-1">
                     <Label className="text-muted-foreground">Evidencia</Label>
                     <Button variant="outline" className="gap-2">
@@ -358,13 +360,13 @@ export default function JustificationsPage() {
                 {/* Validación DCTS */}
                 <div className="p-4 rounded-xl bg-muted/50 space-y-2">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck className={`w-5 h-5 ${selectedJustification.dctsValidation?.validated ? 'text-success' : 'text-muted-foreground'}`} />
+                    <ShieldCheck className={`w-5 h-5 ${selectedJustification.dcts_validated ? 'text-success' : 'text-muted-foreground'}`} />
                     <span className="font-medium">Validación DCTS</span>
                   </div>
-                  {selectedJustification.dctsValidation?.validated ? (
+                  {selectedJustification.dcts_validated ? (
                     <div className="text-sm text-muted-foreground">
-                      <p>Validado el {format(parseISO(selectedJustification.dctsValidation.validatedAt!), 'PPP', { locale: es })}</p>
-                      <p>Por: {selectedJustification.dctsValidation.validatedBy}</p>
+                      <p>Validado el {selectedJustification.dcts_validated_at ? format(parseISO(selectedJustification.dcts_validated_at), 'PPP', { locale: es }) : '-'}</p>
+                      <p>Por: {selectedJustification.dcts_validated_by || '-'}</p>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">Pendiente de validación automática</p>
@@ -375,63 +377,58 @@ export default function JustificationsPage() {
                 <div className="space-y-3">
                   <Label>Flujo de Aprobación</Label>
                   <div className="flex items-center gap-4">
-                    <div className={`flex-1 p-3 rounded-lg border ${selectedJustification.approvalFlow.jefeApproval ? 'border-success bg-success/5' : 'border-muted'}`}>
+                    <div className={`flex-1 p-3 rounded-lg border ${selectedJustification.jefe_approved ? 'border-success bg-success/5' : 'border-muted'}`}>
                       <div className="flex items-center gap-2">
-                        {selectedJustification.approvalFlow.jefeApproval ? (
+                        {selectedJustification.jefe_approved ? (
                           <CheckCircle className="w-5 h-5 text-success" />
                         ) : (
                           <Clock className="w-5 h-5 text-muted-foreground" />
                         )}
                         <span className="font-medium">Jefe de Área</span>
                       </div>
-                      {selectedJustification.approvalFlow.jefeApproval && (
+                      {selectedJustification.jefe_approved && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {selectedJustification.approvalFlow.jefeApproval.by}
+                          {selectedJustification.jefe_approved_by || '-'}
                         </p>
                       )}
                     </div>
-                    <div className={`flex-1 p-3 rounded-lg border ${selectedJustification.approvalFlow.rrhhApproval ? 'border-success bg-success/5' : 'border-muted'}`}>
+                    <div className={`flex-1 p-3 rounded-lg border ${selectedJustification.rrhh_approved ? 'border-success bg-success/5' : 'border-muted'}`}>
                       <div className="flex items-center gap-2">
-                        {selectedJustification.approvalFlow.rrhhApproval ? (
+                        {selectedJustification.rrhh_approved ? (
                           <CheckCircle className="w-5 h-5 text-success" />
                         ) : (
                           <Clock className="w-5 h-5 text-muted-foreground" />
                         )}
                         <span className="font-medium">RRHH</span>
                       </div>
-                      {selectedJustification.approvalFlow.rrhhApproval && (
+                      {selectedJustification.rrhh_approved && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          {selectedJustification.approvalFlow.rrhhApproval.by}
+                          {selectedJustification.rrhh_approved_by || '-'}
                         </p>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Actions */}
-                {selectedJustification.status === 'pending' && isJefe && (
-                  <div className="flex gap-2">
-                    <Button className="flex-1 gap-2" onClick={() => handleApproveJefe(selectedJustification.id)}>
-                      <CheckCircle className="w-4 h-4" />
-                      Aprobar como Jefe
-                    </Button>
-                    <Button variant="destructive" className="gap-2" onClick={() => handleReject(selectedJustification.id)}>
-                      <XCircle className="w-4 h-4" />
+                {/* Action buttons */}
+                {selectedJustification.status === 'pending' && (
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button variant="outline" onClick={() => handleReject(selectedJustification.id)}>
+                      <XCircle className="w-4 h-4 mr-2" />
                       Rechazar
                     </Button>
-                  </div>
-                )}
-
-                {selectedJustification.status === 'jefe_approved' && isAdmin && (
-                  <div className="flex gap-2">
-                    <Button className="flex-1 gap-2 bg-success hover:bg-success/90" onClick={() => handleApproveRRHH(selectedJustification.id)}>
-                      <CheckCircle className="w-4 h-4" />
-                      Aprobar como RRHH
-                    </Button>
-                    <Button variant="destructive" className="gap-2" onClick={() => handleReject(selectedJustification.id)}>
-                      <XCircle className="w-4 h-4" />
-                      Rechazar
-                    </Button>
+                    {isJefe && !selectedJustification.jefe_approved && (
+                      <Button onClick={() => handleApproveJefe(selectedJustification.id)}>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Aprobar (Jefe)
+                      </Button>
+                    )}
+                    {isAdmin && (
+                      <Button onClick={() => handleApproveRRHH(selectedJustification.id)}>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Aprobar (RRHH)
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

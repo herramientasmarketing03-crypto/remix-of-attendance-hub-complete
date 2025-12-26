@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,44 +11,25 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { motion } from 'framer-motion';
 import { 
-  Calendar as CalendarIcon, 
   Plus, 
   Check, 
   X, 
   Eye,
   Clock,
-  Users,
   Palmtree,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
-import { mockEmployees, mockVacations, mockPermissions } from '@/data/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { VacationRequest, Permission } from '@/types/attendance';
+import { useVacations, usePermissions, type VacationRequest, type PermissionRequest } from '@/hooks/useVacations';
+import { useEmployees } from '@/hooks/useEmployees';
 import { toast } from 'sonner';
-import { format, differenceInDays, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { logAction } from '@/services/auditLog';
-import { cn } from '@/lib/utils';
 
-type ApprovalFlow = 'pending' | 'jefe_approved' | 'rrhh_approved' | 'rejected';
-
-interface ExtendedVacation extends VacationRequest {
-  approvalFlow: ApprovalFlow;
-  jefeApprovedBy?: string;
-  jefeApprovedAt?: string;
-}
-
-interface ExtendedPermission extends Permission {
-  approvalFlow: ApprovalFlow;
-  jefeApprovedBy?: string;
-  jefeApprovedAt?: string;
-}
-
-const PERMISSION_TYPES = {
+const PERMISSION_TYPES: Record<string, string> = {
   personal: 'Personal',
   medical: 'Médico',
   academic: 'Académico',
@@ -57,162 +38,92 @@ const PERMISSION_TYPES = {
 };
 
 export default function LeaveRequestsPage() {
-  const { isAdmin, isJefe, isEmpleado, user, userRole, profile } = useAuth();
+  const { userRole, user, profile } = useAuth();
+  const { vacations, loading: vacationsLoading, approveByJefe: approveVacationJefe, approveByRRHH: approveVacationRRHH, reject: rejectVacation } = useVacations();
+  const { permissions, loading: permissionsLoading, approveByJefe: approvePermissionJefe, approveByRRHH: approvePermissionRRHH, reject: rejectPermission } = usePermissions();
+  const { employees } = useEmployees();
+  
   const [activeTab, setActiveTab] = useState<'vacations' | 'permissions'>('vacations');
-  const [selectedVacation, setSelectedVacation] = useState<ExtendedVacation | null>(null);
-  const [selectedPermission, setSelectedPermission] = useState<ExtendedPermission | null>(null);
+  const [selectedVacation, setSelectedVacation] = useState<VacationRequest | null>(null);
+  const [selectedPermission, setSelectedPermission] = useState<PermissionRequest | null>(null);
   const [newRequestOpen, setNewRequestOpen] = useState(false);
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined
-  });
 
-  // Initialize with mock data + approval flow
-  const [vacations, setVacations] = useState<ExtendedVacation[]>(() => 
-    mockVacations.map(v => ({
-      ...v,
-      approvalFlow: v.status === 'approved' ? 'rrhh_approved' as ApprovalFlow : 
-                    v.status === 'pending' ? 'pending' as ApprovalFlow : 'rejected' as ApprovalFlow,
-    }))
+  const isAdmin = userRole?.role === 'admin_rrhh';
+  const isJefe = userRole?.role === 'jefe_area';
+  const isEmpleado = userRole?.role === 'empleado';
+
+  const getEmployee = (employeeId: string) => employees.find(e => e.id === employeeId);
+
+  const pendingVacations = vacations.filter(v => 
+    v.status === 'pending' || (isAdmin && v.approval_flow === 'jefe_approved')
+  );
+  const pendingPermissions = permissions.filter(p => 
+    p.status === 'pending' || (isAdmin && p.approval_flow === 'jefe_approved')
   );
 
-  const [permissions, setPermissions] = useState<ExtendedPermission[]>(() => 
-    mockPermissions.map(p => ({
-      ...p,
-      approvalFlow: p.status === 'approved' ? 'rrhh_approved' as ApprovalFlow : 
-                    p.status === 'pending' ? 'pending' as ApprovalFlow : 'rejected' as ApprovalFlow,
-    }))
-  );
-
-  const getEmployee = (employeeId: string) => mockEmployees.find(e => e.id === employeeId);
-
-  // Filter based on role
-  const myEmployeeId = isEmpleado ? '4' : null; // Mock: empleado@empresa.com is Christian Maldon
-
-  const visibleVacations = vacations.filter(v => {
-    if (isAdmin) return true;
-    if (isJefe) {
-      const employee = getEmployee(v.employeeId);
-      return employee?.department === 'ti';
-    }
-    if (isEmpleado) return v.employeeId === myEmployeeId;
-    return false;
-  });
-
-  const visiblePermissions = permissions.filter(p => {
-    if (isAdmin) return true;
-    if (isJefe) {
-      const employee = getEmployee(p.employeeId);
-      return employee?.department === 'ti';
-    }
-    if (isEmpleado) return p.employeeId === myEmployeeId;
-    return false;
-  });
-
-  const pendingVacations = visibleVacations.filter(v => 
-    v.approvalFlow === 'pending' || (isAdmin && v.approvalFlow === 'jefe_approved')
-  );
-  const pendingPermissions = visiblePermissions.filter(p => 
-    p.approvalFlow === 'pending' || (isAdmin && p.approvalFlow === 'jefe_approved')
-  );
-
-  const handleApproveVacation = (vacation: ExtendedVacation, action: 'approve' | 'reject') => {
-    const employee = getEmployee(vacation.employeeId);
+  const handleApproveVacation = async (vacation: VacationRequest, action: 'approve' | 'reject') => {
+    const approverName = `${profile?.nombres} ${profile?.apellidos}`;
     
-    setVacations(prev => prev.map(v => {
-      if (v.id !== vacation.id) return v;
-      
+    try {
       if (action === 'reject') {
-        return { ...v, approvalFlow: 'rejected' as ApprovalFlow, status: 'rejected' };
+        await rejectVacation(vacation.id);
+        toast.info('Vacaciones rechazadas');
+      } else if (isJefe && vacation.approval_flow === 'pending') {
+        await approveVacationJefe(vacation.id, approverName);
+        toast.success('Vacaciones aprobadas por Jefe');
+      } else if (isAdmin) {
+        await approveVacationRRHH(vacation.id, approverName);
+        toast.success('Vacaciones aprobadas por RRHH');
       }
-      
-      if (isJefe && v.approvalFlow === 'pending') {
-        return { 
-          ...v, 
-          approvalFlow: 'jefe_approved' as ApprovalFlow,
-          jefeApprovedBy: `${profile?.nombres} ${profile?.apellidos}`,
-          jefeApprovedAt: new Date().toISOString()
-        };
-      }
-      
-      if (isAdmin && (v.approvalFlow === 'pending' || v.approvalFlow === 'jefe_approved')) {
-        return { 
-          ...v, 
-          approvalFlow: 'rrhh_approved' as ApprovalFlow, 
-          status: 'approved',
-          approvedBy: `${profile?.nombres} ${profile?.apellidos}`,
-          approvedAt: new Date().toISOString()
-        };
-      }
-      
-      return v;
-    }));
-
-    logAction(
-      action === 'approve' ? 'APPROVE' : 'REJECT', 
-      'vacation', 
-      vacation.id, 
-      user?.id || '', 
-      `${profile?.nombres} ${profile?.apellidos}`,
-      `${action === 'approve' ? 'Aprobó' : 'Rechazó'} vacaciones de ${employee?.name}`
-    );
-
-    toast.success(action === 'approve' ? 'Vacaciones aprobadas' : 'Vacaciones rechazadas');
-    setSelectedVacation(null);
+      setSelectedVacation(null);
+    } catch (error) {
+      console.error('Error processing vacation:', error);
+    }
   };
 
-  const handleApprovePermission = (permission: ExtendedPermission, action: 'approve' | 'reject') => {
-    const employee = getEmployee(permission.employeeId);
+  const handleApprovePermission = async (permission: PermissionRequest, action: 'approve' | 'reject') => {
+    const approverName = `${profile?.nombres} ${profile?.apellidos}`;
     
-    setPermissions(prev => prev.map(p => {
-      if (p.id !== permission.id) return p;
-      
+    try {
       if (action === 'reject') {
-        return { ...p, approvalFlow: 'rejected' as ApprovalFlow, status: 'rejected' };
+        await rejectPermission(permission.id);
+        toast.info('Permiso rechazado');
+      } else if (isJefe && permission.approval_flow === 'pending') {
+        await approvePermissionJefe(permission.id, approverName);
+        toast.success('Permiso aprobado por Jefe');
+      } else if (isAdmin) {
+        await approvePermissionRRHH(permission.id, approverName);
+        toast.success('Permiso aprobado por RRHH');
       }
-      
-      if (isJefe && p.approvalFlow === 'pending') {
-        return { 
-          ...p, 
-          approvalFlow: 'jefe_approved' as ApprovalFlow,
-          jefeApprovedBy: `${profile?.nombres} ${profile?.apellidos}`,
-          jefeApprovedAt: new Date().toISOString()
-        };
-      }
-      
-      if (isAdmin && (p.approvalFlow === 'pending' || p.approvalFlow === 'jefe_approved')) {
-        return { 
-          ...p, 
-          approvalFlow: 'rrhh_approved' as ApprovalFlow, 
-          status: 'approved'
-        };
-      }
-      
-      return p;
-    }));
-
-    logAction(
-      action === 'approve' ? 'APPROVE' : 'REJECT', 
-      'permission', 
-      permission.id, 
-      user?.id || '', 
-      `${profile?.nombres} ${profile?.apellidos}`,
-      `${action === 'approve' ? 'Aprobó' : 'Rechazó'} permiso de ${employee?.name}`
-    );
-
-    toast.success(action === 'approve' ? 'Permiso aprobado' : 'Permiso rechazado');
-    setSelectedPermission(null);
+      setSelectedPermission(null);
+    } catch (error) {
+      console.error('Error processing permission:', error);
+    }
   };
 
-  const getFlowBadge = (flow: ApprovalFlow) => {
-    const config = {
+  const getFlowBadge = (flow: string | null) => {
+    const config: Record<string, { label: string; className: string }> = {
       pending: { label: 'Pendiente', className: 'bg-warning/10 text-warning' },
       jefe_approved: { label: 'Aprobado Jefe', className: 'bg-info/10 text-info' },
       rrhh_approved: { label: 'Aprobado', className: 'bg-success/10 text-success' },
+      completed: { label: 'Completado', className: 'bg-success/10 text-success' },
       rejected: { label: 'Rechazado', className: 'bg-destructive/10 text-destructive' },
     };
-    return <Badge className={config[flow].className}>{config[flow].label}</Badge>;
+    const flowConfig = config[flow || 'pending'];
+    return <Badge className={flowConfig.className}>{flowConfig.label}</Badge>;
   };
+
+  const loading = vacationsLoading || permissionsLoading;
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -232,7 +143,7 @@ export default function LeaveRequestsPage() {
           {isEmpleado && (
             <Dialog open={newRequestOpen} onOpenChange={setNewRequestOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary">
+                <Button>
                   <Plus className="w-4 h-4 mr-2" />
                   Nueva Solicitud
                 </Button>
@@ -249,7 +160,6 @@ export default function LeaveRequestsPage() {
                   <TabsContent value="vacation" className="space-y-4 pt-4">
                     <div className="space-y-2">
                       <Label>Fechas</Label>
-                      <p className="text-sm text-muted-foreground">Selecciona el rango de fechas</p>
                       <div className="flex gap-2">
                         <Input type="date" placeholder="Desde" />
                         <Input type="date" placeholder="Hasta" />
@@ -335,7 +245,7 @@ export default function LeaveRequestsPage() {
                   <Palmtree className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{visibleVacations.length}</p>
+                  <p className="text-2xl font-bold">{vacations.length}</p>
                   <p className="text-sm text-muted-foreground">Vacaciones</p>
                 </div>
               </div>
@@ -348,7 +258,7 @@ export default function LeaveRequestsPage() {
                   <FileText className="w-5 h-5 text-info" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{visiblePermissions.length}</p>
+                  <p className="text-2xl font-bold">{permissions.length}</p>
                   <p className="text-sm text-muted-foreground">Permisos</p>
                 </div>
               </div>
@@ -362,8 +272,8 @@ export default function LeaveRequestsPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
-                    {visibleVacations.filter(v => v.approvalFlow === 'rrhh_approved').length + 
-                     visiblePermissions.filter(p => p.approvalFlow === 'rrhh_approved').length}
+                    {vacations.filter(v => v.approval_flow === 'rrhh_approved' || v.approval_flow === 'completed').length + 
+                     permissions.filter(p => p.approval_flow === 'rrhh_approved' || p.approval_flow === 'completed').length}
                   </p>
                   <p className="text-sm text-muted-foreground">Aprobados</p>
                 </div>
@@ -373,7 +283,7 @@ export default function LeaveRequestsPage() {
         </div>
 
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'vacations' | 'permissions')}>
           <TabsList>
             <TabsTrigger value="vacations" className="gap-2">
               <Palmtree className="w-4 h-4" />
@@ -400,31 +310,30 @@ export default function LeaveRequestsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visibleVacations.map((vacation) => {
-                      const employee = getEmployee(vacation.employeeId);
-                      if (!employee) return null;
-
+                    {vacations.map((vacation) => {
+                      const employee = getEmployee(vacation.employee_id);
+                      
                       return (
                         <TableRow key={vacation.id}>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9">
                                 <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                                  {employee.name.split(' ').map(n => n[0]).join('')}
+                                  {employee?.name.split(' ').map(n => n[0]).join('') || '?'}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium">{employee.name}</p>
-                                <p className="text-xs text-muted-foreground">{employee.position}</p>
+                                <p className="font-medium">{employee?.name || 'Empleado'}</p>
+                                <p className="text-xs text-muted-foreground">{employee?.position || '-'}</p>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            {vacation.startDate} al {vacation.endDate}
+                            {format(parseISO(vacation.start_date), 'dd MMM', { locale: es })} al {format(parseISO(vacation.end_date), 'dd MMM yyyy', { locale: es })}
                           </TableCell>
                           <TableCell>{vacation.days} días</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{vacation.reason}</TableCell>
-                          <TableCell>{getFlowBadge(vacation.approvalFlow)}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{vacation.reason || '-'}</TableCell>
+                          <TableCell>{getFlowBadge(vacation.approval_flow)}</TableCell>
                           <TableCell>
                             <Button 
                               variant="ghost" 
@@ -450,41 +359,46 @@ export default function LeaveRequestsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Empleado</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Horario</TableHead>
-                      <TableHead>Tipo</TableHead>
                       <TableHead>Motivo</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visiblePermissions.map((permission) => {
-                      const employee = getEmployee(permission.employeeId);
-                      if (!employee) return null;
-
+                    {permissions.map((permission) => {
+                      const employee = getEmployee(permission.employee_id);
+                      
                       return (
                         <TableRow key={permission.id}>
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-9 w-9">
                                 <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                                  {employee.name.split(' ').map(n => n[0]).join('')}
+                                  {employee?.name.split(' ').map(n => n[0]).join('') || '?'}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium">{employee.name}</p>
-                                <p className="text-xs text-muted-foreground">{employee.position}</p>
+                                <p className="font-medium">{employee?.name || 'Empleado'}</p>
+                                <p className="text-xs text-muted-foreground">{employee?.position || '-'}</p>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{permission.date}</TableCell>
-                          <TableCell>{permission.startTime} - {permission.endTime}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{PERMISSION_TYPES[permission.type]}</Badge>
+                            <Badge variant="outline">
+                              {PERMISSION_TYPES[permission.type] || permission.type}
+                            </Badge>
                           </TableCell>
-                          <TableCell className="max-w-[200px] truncate">{permission.reason}</TableCell>
-                          <TableCell>{getFlowBadge(permission.approvalFlow)}</TableCell>
+                          <TableCell>{format(parseISO(permission.date), 'dd MMM yyyy', { locale: es })}</TableCell>
+                          <TableCell>
+                            {permission.start_time && permission.end_time 
+                              ? `${permission.start_time} - ${permission.end_time}`
+                              : 'Todo el día'}
+                          </TableCell>
+                          <TableCell className="max-w-[150px] truncate">{permission.reason || '-'}</TableCell>
+                          <TableCell>{getFlowBadge(permission.approval_flow)}</TableCell>
                           <TableCell>
                             <Button 
                               variant="ghost" 
@@ -511,61 +425,71 @@ export default function LeaveRequestsPage() {
               <DialogTitle>Detalle de Vacaciones</DialogTitle>
             </DialogHeader>
             {selectedVacation && (() => {
-              const employee = getEmployee(selectedVacation.employeeId);
-              const canApprove = (isJefe && selectedVacation.approvalFlow === 'pending') ||
-                                (isAdmin && (selectedVacation.approvalFlow === 'pending' || selectedVacation.approvalFlow === 'jefe_approved'));
+              const employee = getEmployee(selectedVacation.employee_id);
+              const canApprove = (isJefe && selectedVacation.approval_flow === 'pending') ||
+                                (isAdmin && (selectedVacation.approval_flow === 'pending' || selectedVacation.approval_flow === 'jefe_approved'));
               
               return (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {employee?.name.split(' ').map(n => n[0]).join('')}
+                        {employee?.name.split(' ').map(n => n[0]).join('') || '?'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold">{employee?.name}</p>
-                      <p className="text-sm text-muted-foreground">{employee?.position}</p>
+                      <p className="font-semibold">{employee?.name || 'Empleado'}</p>
+                      <p className="text-sm text-muted-foreground">{employee?.position || '-'}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">Desde</Label>
-                      <p className="font-medium">{selectedVacation.startDate}</p>
+                      <Label className="text-muted-foreground">Fecha inicio</Label>
+                      <p className="font-medium">{format(parseISO(selectedVacation.start_date), 'PPP', { locale: es })}</p>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Hasta</Label>
-                      <p className="font-medium">{selectedVacation.endDate}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Días</Label>
-                      <p className="font-medium">{selectedVacation.days} días</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Estado</Label>
-                      <div className="mt-1">{getFlowBadge(selectedVacation.approvalFlow)}</div>
+                      <Label className="text-muted-foreground">Fecha fin</Label>
+                      <p className="font-medium">{format(parseISO(selectedVacation.end_date), 'PPP', { locale: es })}</p>
                     </div>
                   </div>
 
                   <div>
-                    <Label className="text-muted-foreground">Motivo</Label>
-                    <p className="p-3 mt-1 rounded-lg bg-muted/50">{selectedVacation.reason}</p>
+                    <Label className="text-muted-foreground">Días solicitados</Label>
+                    <p className="font-medium">{selectedVacation.days} días</p>
                   </div>
 
-                  {selectedVacation.jefeApprovedBy && (
-                    <div className="p-3 rounded-lg bg-info/10 text-info text-sm">
-                      ✓ Aprobado por Jefe: {selectedVacation.jefeApprovedBy}
+                  <div>
+                    <Label className="text-muted-foreground">Motivo</Label>
+                    <p className="font-medium">{selectedVacation.reason || 'No especificado'}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-muted-foreground">Estado</Label>
+                    <div className="mt-1">{getFlowBadge(selectedVacation.approval_flow)}</div>
+                  </div>
+
+                  {selectedVacation.jefe_approved_by && (
+                    <div>
+                      <Label className="text-muted-foreground">Aprobado por Jefe</Label>
+                      <p className="font-medium">{selectedVacation.jefe_approved_by}</p>
                     </div>
                   )}
 
                   {canApprove && (
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button variant="outline" onClick={() => handleApproveVacation(selectedVacation, 'reject')}>
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => handleApproveVacation(selectedVacation, 'reject')}
+                      >
                         <X className="w-4 h-4 mr-2" />
                         Rechazar
                       </Button>
-                      <Button className="bg-success hover:bg-success/90" onClick={() => handleApproveVacation(selectedVacation, 'approve')}>
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleApproveVacation(selectedVacation, 'approve')}
+                      >
                         <Check className="w-4 h-4 mr-2" />
                         Aprobar
                       </Button>
@@ -584,61 +508,75 @@ export default function LeaveRequestsPage() {
               <DialogTitle>Detalle de Permiso</DialogTitle>
             </DialogHeader>
             {selectedPermission && (() => {
-              const employee = getEmployee(selectedPermission.employeeId);
-              const canApprove = (isJefe && selectedPermission.approvalFlow === 'pending') ||
-                                (isAdmin && (selectedPermission.approvalFlow === 'pending' || selectedPermission.approvalFlow === 'jefe_approved'));
+              const employee = getEmployee(selectedPermission.employee_id);
+              const canApprove = (isJefe && selectedPermission.approval_flow === 'pending') ||
+                                (isAdmin && (selectedPermission.approval_flow === 'pending' || selectedPermission.approval_flow === 'jefe_approved'));
               
               return (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback className="bg-primary/10 text-primary">
-                        {employee?.name.split(' ').map(n => n[0]).join('')}
+                        {employee?.name.split(' ').map(n => n[0]).join('') || '?'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold">{employee?.name}</p>
-                      <p className="text-sm text-muted-foreground">{employee?.position}</p>
+                      <p className="font-semibold">{employee?.name || 'Empleado'}</p>
+                      <p className="text-sm text-muted-foreground">{employee?.position || '-'}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">Fecha</Label>
-                      <p className="font-medium">{selectedPermission.date}</p>
-                    </div>
-                    <div>
                       <Label className="text-muted-foreground">Tipo</Label>
-                      <Badge variant="outline" className="mt-1">{PERMISSION_TYPES[selectedPermission.type]}</Badge>
+                      <Badge variant="outline" className="mt-1">
+                        {PERMISSION_TYPES[selectedPermission.type] || selectedPermission.type}
+                      </Badge>
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Horario</Label>
-                      <p className="font-medium">{selectedPermission.startTime} - {selectedPermission.endTime}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Estado</Label>
-                      <div className="mt-1">{getFlowBadge(selectedPermission.approvalFlow)}</div>
+                      <Label className="text-muted-foreground">Fecha</Label>
+                      <p className="font-medium">{format(parseISO(selectedPermission.date), 'PPP', { locale: es })}</p>
                     </div>
                   </div>
+
+                  {selectedPermission.start_time && selectedPermission.end_time && (
+                    <div>
+                      <Label className="text-muted-foreground">Horario</Label>
+                      <p className="font-medium">{selectedPermission.start_time} - {selectedPermission.end_time}</p>
+                    </div>
+                  )}
 
                   <div>
                     <Label className="text-muted-foreground">Motivo</Label>
-                    <p className="p-3 mt-1 rounded-lg bg-muted/50">{selectedPermission.reason}</p>
+                    <p className="font-medium">{selectedPermission.reason || 'No especificado'}</p>
                   </div>
 
-                  {selectedPermission.jefeApprovedBy && (
-                    <div className="p-3 rounded-lg bg-info/10 text-info text-sm">
-                      ✓ Aprobado por Jefe: {selectedPermission.jefeApprovedBy}
+                  <div>
+                    <Label className="text-muted-foreground">Estado</Label>
+                    <div className="mt-1">{getFlowBadge(selectedPermission.approval_flow)}</div>
+                  </div>
+
+                  {selectedPermission.jefe_approved_by && (
+                    <div>
+                      <Label className="text-muted-foreground">Aprobado por Jefe</Label>
+                      <p className="font-medium">{selectedPermission.jefe_approved_by}</p>
                     </div>
                   )}
 
                   {canApprove && (
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button variant="outline" onClick={() => handleApprovePermission(selectedPermission, 'reject')}>
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => handleApprovePermission(selectedPermission, 'reject')}
+                      >
                         <X className="w-4 h-4 mr-2" />
                         Rechazar
                       </Button>
-                      <Button className="bg-success hover:bg-success/90" onClick={() => handleApprovePermission(selectedPermission, 'approve')}>
+                      <Button 
+                        className="flex-1"
+                        onClick={() => handleApprovePermission(selectedPermission, 'approve')}
+                      >
                         <Check className="w-4 h-4 mr-2" />
                         Aprobar
                       </Button>
