@@ -14,6 +14,195 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          created_by_name: string | null
+          date: string
+          department: string | null
+          description: string | null
+          end_time: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          participants: Json | null
+          priority: string | null
+          recurrence: string | null
+          status: string | null
+          time: string | null
+          title: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          created_by_name?: string | null
+          date: string
+          department?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          participants?: Json | null
+          priority?: string | null
+          recurrence?: string | null
+          status?: string | null
+          time?: string | null
+          title: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          created_by_name?: string | null
+          date?: string
+          department?: string | null
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          participants?: Json | null
+          priority?: string | null
+          recurrence?: string | null
+          status?: string | null
+          time?: string | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      applicants: {
+        Row: {
+          applied_at: string | null
+          created_at: string | null
+          department: string
+          document_id: string | null
+          email: string
+          experience_years: number | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          position: string
+          resume_url: string | null
+          salary_expectation: number | null
+          source: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string | null
+          department: string
+          document_id?: string | null
+          email: string
+          experience_years?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          position: string
+          resume_url?: string | null
+          salary_expectation?: number | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string | null
+          department?: string
+          document_id?: string | null
+          email?: string
+          experience_years?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          position?: string
+          resume_url?: string | null
+          salary_expectation?: number | null
+          source?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      area_requirements: {
+        Row: {
+          actual_cost: number | null
+          approved_at: string | null
+          approved_by: string | null
+          category: string
+          created_at: string | null
+          department: string
+          description: string | null
+          estimated_cost: number
+          expense_type: string
+          id: string
+          justification: string | null
+          notes: string | null
+          priority: string | null
+          purchase_date: string | null
+          recurring: boolean | null
+          recurring_period: string | null
+          requested_by: string
+          status: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          category: string
+          created_at?: string | null
+          department: string
+          description?: string | null
+          estimated_cost: number
+          expense_type: string
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          priority?: string | null
+          purchase_date?: string | null
+          recurring?: boolean | null
+          recurring_period?: string | null
+          requested_by: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          created_at?: string | null
+          department?: string
+          description?: string | null
+          estimated_cost?: number
+          expense_type?: string
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          priority?: string | null
+          purchase_date?: string | null
+          recurring?: boolean | null
+          recurring_period?: string | null
+          requested_by?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       attendance_records: {
         Row: {
           absences: number | null
@@ -88,6 +277,51 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: string | null
+          entity: string
+          entity_id: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          user_agent: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: string | null
+          entity: string
+          entity_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: string | null
+          entity?: string
+          entity_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: []
+      }
       contracts: {
         Row: {
           created_at: string | null
@@ -143,6 +377,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      department_positions: {
+        Row: {
+          created_at: string | null
+          current_count: number | null
+          department: string
+          description: string | null
+          id: string
+          is_leadership: boolean | null
+          max_positions: number | null
+          position_name: string
+          reports_to: string | null
+          requirements: string | null
+          responsibilities: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_count?: number | null
+          department: string
+          description?: string | null
+          id?: string
+          is_leadership?: boolean | null
+          max_positions?: number | null
+          position_name: string
+          reports_to?: string | null
+          requirements?: string | null
+          responsibilities?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_count?: number | null
+          department?: string
+          description?: string | null
+          id?: string
+          is_leadership?: boolean | null
+          max_positions?: number | null
+          position_name?: string
+          reports_to?: string | null
+          requirements?: string | null
+          responsibilities?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       employee_tasks: {
         Row: {
@@ -265,6 +544,77 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      inventory_items: {
+        Row: {
+          assigned_to_department: string | null
+          assigned_to_employee: string | null
+          category: string
+          created_at: string | null
+          current_value: number | null
+          description: string | null
+          id: string
+          location: string | null
+          name: string
+          notes: string | null
+          purchase_date: string | null
+          purchase_value: number | null
+          quantity: number | null
+          serial_number: string | null
+          status: string | null
+          unit: string | null
+          updated_at: string | null
+          warranty_until: string | null
+        }
+        Insert: {
+          assigned_to_department?: string | null
+          assigned_to_employee?: string | null
+          category: string
+          created_at?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_value?: number | null
+          quantity?: number | null
+          serial_number?: string | null
+          status?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          warranty_until?: string | null
+        }
+        Update: {
+          assigned_to_department?: string | null
+          assigned_to_employee?: string | null
+          category?: string
+          created_at?: string | null
+          current_value?: number | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          notes?: string | null
+          purchase_date?: string | null
+          purchase_value?: number | null
+          quantity?: number | null
+          serial_number?: string | null
+          status?: string | null
+          unit?: string | null
+          updated_at?: string | null
+          warranty_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_items_assigned_to_employee_fkey"
+            columns: ["assigned_to_employee"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       justifications: {
         Row: {
@@ -518,6 +868,72 @@ export type Database = {
           },
         ]
       }
+      personnel_requirements: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          contract_type: string | null
+          created_at: string | null
+          department: string
+          filled_date: string | null
+          id: string
+          justification: string | null
+          notes: string | null
+          position: string
+          priority: string | null
+          quantity: number | null
+          requested_by: string
+          requirements: Json | null
+          responsibilities: Json | null
+          salary_max: number | null
+          salary_min: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          contract_type?: string | null
+          created_at?: string | null
+          department: string
+          filled_date?: string | null
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          position: string
+          priority?: string | null
+          quantity?: number | null
+          requested_by: string
+          requirements?: Json | null
+          responsibilities?: Json | null
+          salary_max?: number | null
+          salary_min?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          contract_type?: string | null
+          created_at?: string | null
+          department?: string
+          filled_date?: string | null
+          id?: string
+          justification?: string | null
+          notes?: string | null
+          position?: string
+          priority?: string | null
+          quantity?: number | null
+          requested_by?: string
+          requirements?: Json | null
+          responsibilities?: Json | null
+          salary_max?: number | null
+          salary_min?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       position_manuals: {
         Row: {
           created_at: string | null
@@ -645,6 +1061,107 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sanctions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_settings: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      terminations: {
+        Row: {
+          clearance_checklist: Json | null
+          created_at: string | null
+          department: string
+          effective_date: string | null
+          employee_id: string
+          employee_name: string
+          id: string
+          last_working_day: string | null
+          notes: string | null
+          position: string | null
+          processed_by: string | null
+          reason: string | null
+          requested_date: string
+          settlement_amount: number | null
+          status: string | null
+          termination_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          clearance_checklist?: Json | null
+          created_at?: string | null
+          department: string
+          effective_date?: string | null
+          employee_id: string
+          employee_name: string
+          id?: string
+          last_working_day?: string | null
+          notes?: string | null
+          position?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_date?: string
+          settlement_amount?: number | null
+          status?: string | null
+          termination_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          clearance_checklist?: Json | null
+          created_at?: string | null
+          department?: string
+          effective_date?: string | null
+          employee_id?: string
+          employee_name?: string
+          id?: string
+          last_working_day?: string | null
+          notes?: string | null
+          position?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_date?: string
+          settlement_amount?: number | null
+          status?: string | null
+          termination_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminations_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
