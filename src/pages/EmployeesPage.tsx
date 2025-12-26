@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { UserPlus, Download, FileCheck, Search, Plus, AlertTriangle, DollarSign, User, Eye, RefreshCw, FileText, Clock } from 'lucide-react';
+import { UserPlus, Download, FileCheck, Search, Plus, AlertTriangle, DollarSign, User, Eye, RefreshCw, FileText, Clock, Pencil, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { EmployeeTable } from '@/components/employees/EmployeeTable';
 import { EmployeeDetailDialog } from '@/components/employees/EmployeeDetailDialog';
 import { NewEmployeeForm } from '@/components/employees/NewEmployeeForm';
+import { EditEmployeeForm } from '@/components/employees/EditEmployeeForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { mockEmployees, mockContracts, CONTRACT_TYPES } from '@/data/mockData';
+import { mockContracts, CONTRACT_TYPES } from '@/data/mockData';
 import { toast } from 'sonner';
-import { Employee, EmployeeContract, DEPARTMENTS } from '@/types/attendance';
+import { Employee, DEPARTMENTS } from '@/types/attendance';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,13 +19,36 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { getDaysUntilExpiration, getContractAlerts, groupAlertsByLevel } from '@/services/contractAlerts';
+import { useEmployees, type Employee as DBEmployee, type EmployeeInsert } from '@/hooks/useEmployees';
+import { useContracts } from '@/hooks/useContracts';
+
+// Helper to convert DB employee to legacy format
+const toEmployee = (dbEmployee: DBEmployee): Employee => ({
+  id: dbEmployee.id,
+  documentId: dbEmployee.document_id,
+  name: dbEmployee.name,
+  email: dbEmployee.email || '',
+  phone: dbEmployee.phone || '',
+  department: dbEmployee.department as keyof typeof DEPARTMENTS,
+  position: dbEmployee.position || '',
+  hireDate: dbEmployee.hire_date || '',
+  contractType: (dbEmployee.contract_type || 'indefinido') as Employee['contractType'],
+  contractEndDate: dbEmployee.contract_end_date || undefined,
+  avatar: dbEmployee.avatar_url || undefined,
+  status: (dbEmployee.status || 'active') as Employee['status'],
+});
 
 const EmployeesPage = () => {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees);
+  const { employees: dbEmployees, loading, createEmployee, updateEmployee, deleteEmployee, refetch } = useEmployees();
+  const { contracts: dbContracts } = useContracts();
+  
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('employees');
   const [newEmployeeOpen, setNewEmployeeOpen] = useState(false);
+  const [editEmployeeOpen, setEditEmployeeOpen] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState<DBEmployee | null>(null);
+  const [saving, setSaving] = useState(false);
   
   // Contract states
   const [search, setSearch] = useState('');
@@ -33,6 +57,9 @@ const EmployeesPage = () => {
   const [newContractOpen, setNewContractOpen] = useState(false);
   const [contractDetailOpen, setContractDetailOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<any>(null);
+
+  // Convert DB employees to legacy format for EmployeeTable
+  const employees = dbEmployees.map(toEmployee);
 
   const handleViewEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -44,14 +71,61 @@ const EmployeesPage = () => {
   };
 
   const handleEmployeeUpdate = (updatedEmployee: Employee) => {
-    setEmployees(prev => prev.map(emp => emp.id === updatedEmployee.id ? updatedEmployee : emp));
     setSelectedEmployee(updatedEmployee);
   };
 
-  const handleCreateEmployee = (newEmployee: Employee) => {
-    setEmployees(prev => [newEmployee, ...prev]);
-    setNewEmployeeOpen(false);
-    toast.success(`Empleado ${newEmployee.name} creado correctamente`);
+  const handleEditEmployee = (employee: Employee) => {
+    const dbEmp = dbEmployees.find(e => e.id === employee.id);
+    if (dbEmp) {
+      setEmployeeToEdit(dbEmp);
+      setEditEmployeeOpen(true);
+    }
+  };
+
+  const handleCreateEmployee = async (newEmployee: Employee) => {
+    setSaving(true);
+    try {
+      const employeeData: EmployeeInsert = {
+        document_id: newEmployee.documentId,
+        name: newEmployee.name,
+        email: newEmployee.email || null,
+        phone: newEmployee.phone || null,
+        department: newEmployee.department,
+        position: newEmployee.position || null,
+        hire_date: newEmployee.hireDate || null,
+        contract_type: (newEmployee.contractType === 'locacion' ? 'honorarios' : newEmployee.contractType) as any || 'indefinido',
+        contract_end_date: newEmployee.contractEndDate || null,
+        status: newEmployee.status || 'active',
+      };
+      
+      await createEmployee(employeeData);
+      setNewEmployeeOpen(false);
+    } catch (error) {
+      console.error('Error creating employee:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveEditEmployee = async (id: string, updates: any) => {
+    setSaving(true);
+    try {
+      await updateEmployee(id, updates);
+      setEditEmployeeOpen(false);
+      setEmployeeToEdit(null);
+      
+      // Update selected employee if viewing
+      if (selectedEmployee?.id === id) {
+        const updated = dbEmployees.find(e => e.id === id);
+        if (updated) {
+          setSelectedEmployee(toEmployee(updated));
+        }
+      }
+    } catch (error) {
+      console.error('Error updating employee:', error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCreateContract = () => {
@@ -64,9 +138,9 @@ const EmployeesPage = () => {
     setContractDetailOpen(false);
   };
 
-  // Contract data processing
+  // Contract data processing - using mock for now, will integrate with useContracts
   const contractsWithEmployee = mockContracts.map(contract => {
-    const employee = mockEmployees.find(e => e.id === contract.employeeId);
+    const employee = employees.find(e => e.id === contract.employeeId);
     const daysRemaining = getDaysUntilExpiration(contract.endDate);
     return { ...contract, employee, daysRemaining };
   });
@@ -118,6 +192,19 @@ const EmployeesPage = () => {
     return <Badge variant={variant}>{label}</Badge>;
   };
 
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Cargando empleados...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -127,6 +214,10 @@ const EmployeesPage = () => {
             <p className="text-muted-foreground">Administra empleados y contratos laborales</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Actualizar
+            </Button>
             <Button variant="outline"><Download className="w-4 h-4 mr-2" />Exportar</Button>
             {activeTab === 'employees' ? (
               <Dialog open={newEmployeeOpen} onOpenChange={setNewEmployeeOpen}>
@@ -161,7 +252,7 @@ const EmployeesPage = () => {
                       <Select>
                         <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
                         <SelectContent>
-                          {mockEmployees.map(emp => (
+                          {employees.map(emp => (
                             <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
                           ))}
                         </SelectContent>
@@ -219,6 +310,62 @@ const EmployeesPage = () => {
           </div>
         </motion.div>
 
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <User className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{employees.length}</p>
+                  <p className="text-sm text-muted-foreground">Total Empleados</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-success/10">
+                  <UserPlus className="w-6 h-6 text-success" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{employees.filter(e => e.status === 'active').length}</p>
+                  <p className="text-sm text-muted-foreground">Activos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-warning/10">
+                  <Clock className="w-6 h-6 text-warning" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{employees.filter(e => e.status === 'on_leave').length}</p>
+                  <p className="text-sm text-muted-foreground">Con Permiso</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-destructive/10">
+                  <AlertTriangle className="w-6 h-6 text-destructive" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{alerts.length}</p>
+                  <p className="text-sm text-muted-foreground">Alertas Contrato</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="employees" className="gap-2">
@@ -240,7 +387,12 @@ const EmployeesPage = () => {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <Card className="glass-card">
                 <CardContent className="p-6">
-                  <EmployeeTable employees={employees} onViewEmployee={handleViewEmployee} onContactEmployee={handleContactEmployee} />
+                  <EmployeeTable 
+                    employees={employees} 
+                    onViewEmployee={handleViewEmployee} 
+                    onContactEmployee={handleContactEmployee}
+                    onEditEmployee={handleEditEmployee}
+                  />
                 </CardContent>
               </Card>
             </motion.div>
@@ -412,6 +564,29 @@ const EmployeesPage = () => {
           </TabsContent>
         </Tabs>
 
+        {/* Edit Employee Dialog */}
+        <Dialog open={editEmployeeOpen} onOpenChange={setEditEmployeeOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="w-5 h-5" />
+                Editar Empleado
+              </DialogTitle>
+            </DialogHeader>
+            {employeeToEdit && (
+              <EditEmployeeForm
+                employee={employeeToEdit}
+                onSubmit={handleSaveEditEmployee}
+                onCancel={() => {
+                  setEditEmployeeOpen(false);
+                  setEmployeeToEdit(null);
+                }}
+                loading={saving}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
         {/* Contract Detail Dialog */}
         <Dialog open={contractDetailOpen} onOpenChange={setContractDetailOpen}>
           <DialogContent className="max-w-2xl">
@@ -493,7 +668,13 @@ const EmployeesPage = () => {
           </DialogContent>
         </Dialog>
 
-        <EmployeeDetailDialog employee={selectedEmployee} open={dialogOpen} onOpenChange={setDialogOpen} onEmployeeUpdate={handleEmployeeUpdate} />
+        <EmployeeDetailDialog 
+          employee={selectedEmployee} 
+          open={dialogOpen} 
+          onOpenChange={setDialogOpen} 
+          onEmployeeUpdate={handleEmployeeUpdate}
+          onEditEmployee={handleEditEmployee}
+        />
       </div>
     </MainLayout>
   );

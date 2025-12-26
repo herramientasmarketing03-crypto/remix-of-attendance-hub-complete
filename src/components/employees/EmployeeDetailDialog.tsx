@@ -53,9 +53,10 @@ interface EmployeeDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEmployeeUpdate?: (employee: Employee, contract?: Partial<EmployeeContract>) => void;
+  onEditEmployee?: (employee: Employee) => void;
 }
 
-export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeUpdate }: EmployeeDetailDialogProps) {
+export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeUpdate, onEditEmployee }: EmployeeDetailDialogProps) {
   const [activeTab, setActiveTab] = useState('info');
   const [isAddingSanction, setIsAddingSanction] = useState(false);
   const [isAddingAddendum, setIsAddingAddendum] = useState(false);
@@ -291,6 +292,12 @@ export function EmployeeDetailDialog({ employee, open, onOpenChange, onEmployeeU
                         <p className="text-muted-foreground">{employee.position || 'Sin cargo asignado'}</p>
                       </div>
                       <div className="flex gap-2">
+                        {onEditEmployee && (
+                          <Button variant="outline" size="sm" onClick={() => onEditEmployee(employee)}>
+                            <Edit className="w-4 h-4 mr-1" />
+                            Editar
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={handleDownloadFile}>
                           <Download className="w-4 h-4" />
                         </Button>

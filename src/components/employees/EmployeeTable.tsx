@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Search, Filter, Download, Eye, Mail } from 'lucide-react';
+import { Search, Filter, Download, Eye, Mail, Pencil } from 'lucide-react';
 import { Employee, DEPARTMENTS, Department } from '@/types/attendance';
 import { cn } from '@/lib/utils';
 
@@ -27,9 +27,10 @@ interface EmployeeTableProps {
   employees: Employee[];
   onViewEmployee?: (employee: Employee) => void;
   onContactEmployee?: (employee: Employee) => void;
+  onEditEmployee?: (employee: Employee) => void;
 }
 
-export function EmployeeTable({ employees, onViewEmployee, onContactEmployee }: EmployeeTableProps) {
+export function EmployeeTable({ employees, onViewEmployee, onContactEmployee, onEditEmployee }: EmployeeTableProps) {
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
 
@@ -141,9 +142,23 @@ export function EmployeeTable({ employees, onViewEmployee, onContactEmployee }: 
                           e.stopPropagation();
                           onViewEmployee?.(employee);
                         }}
+                        title="Ver detalle"
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
+                      {onEditEmployee && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditEmployee?.(employee);
+                          }}
+                          title="Editar"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -151,6 +166,7 @@ export function EmployeeTable({ employees, onViewEmployee, onContactEmployee }: 
                           e.stopPropagation();
                           onContactEmployee?.(employee);
                         }}
+                        title="Contactar"
                       >
                         <Mail className="w-4 h-4" />
                       </Button>
