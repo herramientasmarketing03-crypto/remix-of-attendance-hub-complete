@@ -47,6 +47,7 @@ const ENTITY_LABELS: Record<AuditEntity, string> = {
   evaluation: 'Evaluación',
   task: 'Tarea',
   user: 'Usuario',
+  message: 'Mensaje',
 };
 
 export default function AuditLogPage() {
